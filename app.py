@@ -302,5 +302,13 @@ def data_engineering():
                            progress_percent=progress_percent)
 
 
+@app.route('/user_guide')
+def user_guide():
+    """
+    Renders the user guide page.
+    """
+    return render_template('user_guide.html')
+
+
 if __name__ == '__main__':
     app.run(debug=True)
