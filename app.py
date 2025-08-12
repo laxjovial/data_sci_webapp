@@ -1,24 +1,20 @@
 # app.py
 
-from flask import Flask, render_template, request, redirect, url_for, session, send_file
+from flask import Flask, render_template, request, redirect, url_for, session
 from utils.data_ingestion import load_data, get_dataframe_summary
 from utils.data_cleaning import (
     handle_missing_values, rename_column, convert_dtype, 
     remove_duplicates, standardize_text, handle_outliers, correct_inconsistencies
 )
-from utils.data_visualization import generate_plot
-from utils.data_engineering import create_new_feature, one_hot_encode_column # New Import!
-from utils.data_export import export_dataframe, export_ipynb
+from utils.data_engineering import apply_encoding, remove_outliers
 import pandas as pd
 import numpy as np
 import io
 
 app = Flask(__name__)
-# It's better to store the secret key in an environment variable for production
-app.secret_key = 'your_super_secret_key_here' 
+app.secret_key = 'your_super_secret_key_here' # For session management
 
 # Define the stages of our data science pipeline
-# Updated with Feature Engineering!
 PIPELINE_STAGES = [
     "Data Ingestion",
     "Data Cleaning",
@@ -39,9 +35,7 @@ def _get_df_from_session():
     """
     if 'df' in session:
         try:
-            # Use compression to handle larger dataframes within the session limit
-            df_json_str = session['df']
-            df = pd.read_json(df_json_str)
+            df = pd.read_json(session['df'])
             return df, None
         except Exception as e:
             return None, f"Error restoring DataFrame from session: {e}"
@@ -50,176 +44,136 @@ def _get_df_from_session():
 def _get_progress_data(current_stage_name):
     """
     Calculates the current progress based on the pipeline stages.
-    
+
     Returns:
-        tuple: (current_stage_name, progress_percentage)
+        tuple: A tuple containing the current stage name and progress percentage.
     """
     try:
         current_index = PIPELINE_STAGES.index(current_stage_name)
-        progress_percent = int(((current_index + 1) / len(PIPELINE_STAGES)) * 100)
-        return current_stage_name, progress_percent
+        progress_percent = int((current_index / (len(PIPELINE_STAGES) - 1)) * 100)
     except ValueError:
-        return "Unknown Stage", 0
-
-# --- NEW ROUTES FOR EXPORTING DATA ---
-@app.route('/export_data', methods=['POST'])
-def export_data():
-    """
-    Handles the request to export the current DataFrame.
-    """
-    df, error_message = _get_df_from_session()
-    if error_message:
-        return redirect(url_for('index'))
-
-    file_format = request.form.get('file_format')
-    
-    if file_format == 'ipynb':
-        df_head_html, _, _, _, _ = get_dataframe_summary(df)
-        current_stage, _ = _get_progress_data(request.form.get('current_stage'))
-        
-        # This is a placeholder for a real code log. 
-        # You'll need to store and retrieve the actual code log from the session.
-        code_log = [
-            "# This is a placeholder code block.\n# You would store actual code from previous steps here.",
-            "import pandas as pd\n\ndf = pd.read_csv('your_data.csv')"
-        ]
-        
-        file_content, mime_type = export_ipynb(df_head_html, code_log, current_stage)
-        if file_content:
-            return send_file(io.BytesIO(file_content), 
-                             mimetype=mime_type, 
-                             as_attachment=True, 
-                             download_name=f'analysis_{current_stage}.ipynb')
-    else:
-        file_content, mime_type = export_dataframe(df, file_format)
-        if file_content:
-            return send_file(io.BytesIO(file_content),
-                             mimetype=mime_type,
-                             as_attachment=True,
-                             download_name=f'cleaned_data.{file_format}')
-    
-    return "Error during export.", 500
-
-
-# --- EXISTING ROUTES (MODIFIED SLIGHTLY FOR EXPORT) ---
+        progress_percent = 0
+    return current_stage_name, progress_percent
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
     """
-    The main route for the web application, now with file upload functionality.
+    Handles the data ingestion phase.
     """
+    error_message = None
     if request.method == 'POST':
         source_type = request.form.get('source_type')
-        
-        if 'file' in request.files and request.files['file'].filename != '':
-            source_file = request.files['file']
-            df, error_message = load_data('upload', source_file)
-        
-        elif 'source_path' in request.form and request.form.get('source_path') != '':
-            source_path = request.form.get('source_path')
-            df, error_message = load_data('url', source_path)
-            
-        else:
-            current_stage, progress_percent = _get_progress_data("Data Ingestion")
-            return render_template('index.html', error="Please provide a valid file or URL.", current_stage=current_stage, progress_percent=progress_percent)
-
-        if error_message:
-            current_stage, progress_percent = _get_progress_data("Data Ingestion")
-            return render_template('index.html', error=error_message, current_stage=current_stage, progress_percent=progress_percent)
-
-        # We'll use a compressed JSON format to handle larger dataframes in session
-        # This will help with the "file too large" issue you mentioned
-        session['df'] = df.to_json(compression='infer')
-        return redirect(url_for('data_viewer'))
-
+        if source_type == 'url':
+            url = request.form.get('url')
+            if url:
+                df, error_message = load_data(url=url)
+                if df is not None:
+                    session['df'] = df.to_json()
+                    return redirect(url_for('data_viewer'))
+            else:
+                error_message = "Please provide a valid URL."
+        elif source_type == 'upload':
+            file = request.files.get('file')
+            if file:
+                df, error_message = load_data(file=file)
+                if df is not None:
+                    session['df'] = df.to_json()
+                    return redirect(url_for('data_viewer'))
+            else:
+                error_message = "Please select a file to upload."
+    
     current_stage, progress_percent = _get_progress_data("Data Ingestion")
-    return render_template('index.html', current_stage=current_stage, progress_percent=progress_percent)
-
+    
+    return render_template('index.html', 
+                           error=error_message, 
+                           current_stage=current_stage, 
+                           progress_percent=progress_percent)
 
 @app.route('/data_viewer')
 def data_viewer():
+    """
+    Renders the data viewing page with a summary of the loaded DataFrame.
+    """
     df, error_message = _get_df_from_session()
     if error_message:
-        current_stage, progress_percent = _get_progress_data("Data Ingestion")
-        return render_template('index.html', error=error_message, current_stage=current_stage, progress_percent=progress_percent)
+        return redirect(url_for('index'))
 
     df_head_html, info_str, desc_html, columns, unique_values = get_dataframe_summary(df)
 
     current_stage, progress_percent = _get_progress_data("Data Ingestion")
-    
-    return render_template('data_viewer.html', 
+
+    return render_template('data_viewer.html',
                            df_head=df_head_html,
                            df_info=info_str,
                            df_desc=desc_html,
                            columns=columns,
-                           unique_values=unique_values, # Added this to support your EDA request
+                           unique_values=unique_values,
                            current_stage=current_stage,
                            progress_percent=progress_percent)
 
-
-@app.route('/data_cleaning')
+@app.route('/data_cleaning', methods=['GET', 'POST'])
 def data_cleaning():
-    df, error_message = _get_df_from_session()
-    if error_message:
-        current_stage, progress_percent = _get_progress_data("Data Ingestion")
-        return redirect(url_for('index'))
-
-    df_head_html, _, _, columns, _ = get_dataframe_summary(df)
-    
-    current_stage, progress_percent = _get_progress_data("Data Cleaning")
-
-    return render_template('data_cleaning.html',
-                           df_head=df_head_html,
-                           columns=columns,
-                           current_stage=current_stage,
-                           progress_percent=progress_percent)
-
-
-@app.route('/clean_data', methods=['POST'])
-def clean_data():
+    """
+    Renders the data cleaning page and handles cleaning operations.
+    """
     df, error_message = _get_df_from_session()
     if error_message:
         return redirect(url_for('index'))
 
-    action_type = request.form.get('action_type')
     new_error_message = None
 
-    if action_type == 'handle_missing':
-        columns = request.form.getlist('columns')
-        strategy = request.form.get('strategy')
-        if columns and strategy:
-            df = handle_missing_values(df, columns, strategy)
-    
-    elif action_type == 'rename_column':
-        old_col = request.form.get('old_col')
-        new_col = request.form.get('new_col')
-        if old_col and new_col:
-            df = rename_column(df, old_col, new_col)
+    if request.method == 'POST':
+        action = request.form.get('action')
+        columns_to_process = request.form.getlist('columns')
+        
+        if not columns_to_process:
+            new_error_message = "Please select at least one column."
+        else:
+            if action == 'missing_values':
+                strategy = request.form.get('strategy')
+                df = handle_missing_values(df, columns_to_process, strategy)
+            elif action == 'rename_column':
+                old_col = request.form.get('old_col')
+                new_col = request.form.get('new_col')
+                if old_col and new_col:
+                    df = rename_column(df, old_col, new_col)
+                else:
+                    new_error_message = "Please provide both old and new column names."
+            elif action == 'convert_dtype':
+                dtype_col = request.form.get('dtype_col')
+                new_dtype = request.form.get('new_dtype')
+                if dtype_col and new_dtype:
+                    df, new_error_message = convert_dtype(df, dtype_col, new_dtype)
+                else:
+                    new_error_message = "Please select a column and a data type."
+            elif action == 'remove_duplicates':
+                df = remove_duplicates(df, columns_to_process)
+            elif action == 'standardize_text':
+                standardize_col = request.form.get('standardize_col')
+                if standardize_col:
+                    df = standardize_text(df, standardize_col)
+                else:
+                    new_error_message = "Please select a column to standardize."
+            elif action == 'handle_outliers':
+                outlier_col = request.form.get('outlier_col')
+                outlier_method = request.form.get('outlier_method')
+                if outlier_col and outlier_method:
+                    df, new_error_message = handle_outliers(df, outlier_col, outlier_method)
+                else:
+                    new_error_message = "Please select a column and a method."
+            elif action == 'correct_inconsistencies':
+                inconsist_col = request.form.get('inconsist_col')
+                mapping_str = request.form.get('mapping_dict')
+                try:
+                    mapping_dict = eval(mapping_str)
+                    df, new_error_message = correct_inconsistencies(df, inconsist_col, mapping_dict)
+                except Exception as e:
+                    new_error_message = f"Invalid dictionary format: {e}"
 
-    elif action_type == 'convert_type':
-        column = request.form.get('col_to_convert')
-        new_type = request.form.get('new_type')
-        if column and new_type:
-            df, new_error_message = convert_dtype(df, column, new_type)
-
-    elif action_type == 'remove_duplicates':
-        df = remove_duplicates(df)
-        new_error_message = "Duplicate rows have been removed."
-
-    elif action_type == 'standardize_text':
-        columns = request.form.getlist('standardize_cols')
-        if columns:
-            df = standardize_text(df, columns)
-    
-    elif action_type == 'handle_outliers':
-        column = request.form.get('outlier_col')
-        method = request.form.get('outlier_method')
-        if column and method:
-            df, new_error_message = handle_outliers(df, column, method)
-
-    session['df'] = df.to_json(compression='infer')
+            session['df'] = df.to_json()
     
     df_head_html, _, _, columns, _ = get_dataframe_summary(df)
+
     current_stage, progress_percent = _get_progress_data("Data Cleaning")
 
     return render_template('data_cleaning.html',
@@ -229,9 +183,11 @@ def clean_data():
                            current_stage=current_stage,
                            progress_percent=progress_percent)
 
-
 @app.route('/data_eda', methods=['GET', 'POST'])
 def data_eda():
+    """
+    Renders the EDA and Visualization page.
+    """
     df, error_message = _get_df_from_session()
     if error_message:
         return redirect(url_for('index'))
@@ -253,66 +209,58 @@ def data_eda():
                            df_info=info_str,
                            df_desc=desc_html,
                            columns=columns,
-                           unique_values=unique_values,
                            plot_json=plot_json,
                            error=error_message,
                            current_stage=current_stage,
                            progress_percent=progress_percent)
 
-# --- NEW ROUTE FOR FEATURE ENGINEERING ---
-@app.route('/feature_engineering')
+@app.route('/feature_engineering', methods=['GET', 'POST'])
 def feature_engineering():
     """
-    Renders the Feature Engineering page.
+    Renders the feature engineering page and handles encoding operations.
     """
     df, error_message = _get_df_from_session()
     if error_message:
         return redirect(url_for('index'))
-
-    df_head_html, _, _, columns, _ = get_dataframe_summary(df)
     
-    current_stage, progress_percent = _get_progress_data("Feature Engineering")
-
-    return render_template('feature_engineering.html',
-                           df_head=df_head_html,
-                           columns=columns,
-                           current_stage=current_stage,
-                           progress_percent=progress_percent)
-
-@app.route('/engineer_features', methods=['POST'])
-def engineer_features():
-    """
-    Handles the form submissions for feature engineering actions.
-    """
-    df, error_message = _get_df_from_session()
-    if error_message:
-        return redirect(url_for('index'))
-
-    action_type = request.form.get('action_type')
     new_error_message = None
-
-    if action_type == 'create_feature':
-        col1 = request.form.get('col1')
-        col2 = request.form.get('col2')
-        new_col_name = request.form.get('new_col_name')
-        operation = request.form.get('operation')
-        if col1 and col2 and new_col_name and operation:
-            df, new_error_message = create_new_feature(df, col1, col2, new_col_name, operation)
     
-    elif action_type == 'one_hot_encode':
-        column = request.form.get('encode_col')
-        if column:
-            df, new_error_message = one_hot_encode_column(df, column)
-
-    session['df'] = df.to_json(compression='infer')
+    if request.method == 'POST':
+        encoding_type = request.form.get('encoding_type')
+        columns_to_encode = request.form.getlist('columns')
+        
+        if not columns_to_encode:
+            new_error_message = "Please select at least one column to encode."
+        else:
+            df, new_error_message = apply_encoding(df, columns_to_encode, encoding_type)
+            session['df'] = df.to_json()
     
-    df_head_html, _, _, columns, _ = get_dataframe_summary(df)
+    df_head_html, info_str, desc_html, columns, unique_values = get_dataframe_summary(df)
+
     current_stage, progress_percent = _get_progress_data("Feature Engineering")
 
     return render_template('feature_engineering.html',
                            df_head=df_head_html,
                            columns=columns,
                            error=new_error_message,
+                           current_stage=current_stage,
+                           progress_percent=progress_percent)
+
+@app.route('/model_building')
+def model_building():
+    """
+    Renders a placeholder for the model building stage.
+    """
+    df, error_message = _get_df_from_session()
+    if error_message:
+        return redirect(url_for('index'))
+    
+    df_head_html, _, _, _, _ = get_dataframe_summary(df)
+    
+    current_stage, progress_percent = _get_progress_data("Model Building")
+
+    return render_template('model_building.html',
+                           df_head=df_head_html,
                            current_stage=current_stage,
                            progress_percent=progress_percent)
 
