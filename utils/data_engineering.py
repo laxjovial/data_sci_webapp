@@ -1,7 +1,7 @@
 # utils/data_engineering.py
 
 import pandas as pd
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.preprocessing import OneHotEncoder, StandardScaler, LabelEncoder, OrdinalEncoder
 import numpy as np
 
 def create_new_feature(df, col1, col2, operation, new_col_name):
@@ -53,43 +53,85 @@ def create_new_feature(df, col1, col2, operation, new_col_name):
     except Exception as e:
         return None, f"An error occurred during feature creation: {e}"
 
-def one_hot_encode(df, columns):
+def apply_encoding(df, columns, encoding_type):
     """
-    Performs one-hot encoding on specified categorical columns.
+    Applies various encoding techniques to specified categorical columns.
 
-    Technical: This function uses the scikit-learn OneHotEncoder to convert
-    categorical columns into a format that is more suitable for machine learning
-    algorithms. It creates a new binary column for each unique category in the
-    original columns.
+    Technical: This function provides a unified interface for several encoding
+    methods. Label Encoding is for binary data. Ordinal Encoding is for
+    ordered categorical data. One-Hot Encoding creates new binary columns
+    for each category. Frequency Encoding replaces categories with their
+    frequency in the dataset.
 
-    Layman: This is a way to turn text categories, like "City" (e.g., New York,
-    London), into numbers that a computer can understand. Instead of one "City"
-    column, you'll get new columns like "City_New York" and "City_London,"
-    with a 1 or 0 indicating if the row belongs to that city.
+    Layman: This is where we turn text-based categories (like 'car' or 'radio/TV')
+    into numbers that a computer can understand. We have different ways to do this,
+    depending on whether the categories have a natural order or not.
 
     Args:
         df (pd.DataFrame): The input DataFrame.
         columns (list): A list of column names to encode.
+        encoding_type (str): The type of encoding to apply ('one_hot', 'label', 'ordinal', 'frequency').
 
     Returns:
-        tuple: A tuple containing the new DataFrame and an error message (if any).
+        tuple: The DataFrame with encoded columns and an error message (if any).
     """
-    df_engineered = df.copy()
-    try:
-        ohe = OneHotEncoder(handle_unknown='ignore', sparse_output=False)
-        encoded_data = ohe.fit_transform(df_engineered[columns])
-        encoded_df = pd.DataFrame(encoded_data, columns=ohe.get_feature_names_out(columns))
-        
-        # Drop original columns and concatenate new ones
-        df_engineered.drop(columns=columns, inplace=True)
-        # Reset index to ensure proper concatenation
-        df_engineered.reset_index(drop=True, inplace=True)
-        encoded_df.reset_index(drop=True, inplace=True)
-        
-        df_engineered = pd.concat([df_engineered, encoded_df], axis=1)
-        return df_engineered, None
-    except Exception as e:
-        return None, f"An error occurred during one-hot encoding: {e}"
+    df_encoded = df.copy()
+    error_message = None
+
+    if encoding_type == 'label':
+        # Label Encoding is best for binary categories like 'male'/'female'
+        for col in columns:
+            if df_encoded[col].nunique() <= 2:
+                try:
+                    le = LabelEncoder()
+                    df_encoded[col] = le.fit_transform(df_encoded[col])
+                except Exception as e:
+                    error_message = f"Error applying Label Encoding to '{col}': {e}"
+                    return df, error_message
+            else:
+                error_message = f"Label Encoding is recommended for binary columns. '{col}' has more than 2 unique values."
+                return df, error_message
+                
+    elif encoding_type == 'ordinal':
+        # Ordinal Encoding is for categories with a clear order, like 'little' < 'moderate' < 'rich'
+        try:
+            oe = OrdinalEncoder()
+            df_encoded[columns] = oe.fit_transform(df_encoded[columns])
+        except Exception as e:
+            error_message = f"Error applying Ordinal Encoding: {e}"
+            return df, error_message
+            
+    elif encoding_type == 'one_hot':
+        # One-Hot Encoding is for nominal categories with no order.
+        try:
+            ohe = OneHotEncoder(handle_unknown='ignore', sparse_output=False)
+            encoded_data = ohe.fit_transform(df_encoded[columns])
+            encoded_df = pd.DataFrame(encoded_data, columns=ohe.get_feature_names_out(columns))
+            
+            df_encoded.drop(columns=columns, inplace=True)
+            df_encoded.reset_index(drop=True, inplace=True)
+            encoded_df.reset_index(drop=True, inplace=True)
+            
+            df_encoded = pd.concat([df_encoded, encoded_df], axis=1)
+        except Exception as e:
+            error_message = f"Error applying One-Hot Encoding: {e}"
+            return df, error_message
+            
+    elif encoding_type == 'frequency':
+        # Frequency Encoding replaces categories with the proportion of their occurrence.
+        try:
+            for col in columns:
+                frequency_map = df_encoded[col].value_counts(normalize=True)
+                df_encoded[col] = df_encoded[col].map(frequency_map)
+        except Exception as e:
+            error_message = f"Error applying Frequency Encoding: {e}"
+            return df, error_message
+
+    else:
+        error_message = "Invalid encoding type selected."
+
+    return df_encoded, error_message
+
 
 def scale_features(df, columns, scaler_type):
     """
