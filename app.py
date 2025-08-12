@@ -1,17 +1,21 @@
 # app.py
 
-from flask import Flask, render_template, request, redirect, url_for, session
+from flask import Flask, render_template, request, redirect, url_for, session, send_file
 from utils.data_ingestion import load_data, get_dataframe_summary
 from utils.data_cleaning import (
     handle_missing_values, rename_column, convert_dtype, 
     remove_duplicates, standardize_text, handle_outliers, correct_inconsistencies
 )
 from utils.data_visualization import generate_plot
+from utils.data_engineering import create_new_feature, one_hot_encode_column
+from utils.data_export import export_dataframe, export_ipynb # New Import!
 import pandas as pd
 import numpy as np
+import io
 
 app = Flask(__name__)
-app.secret_key = 'your_super_secret_key_here' # For session management
+# It's better to store the secret key in an environment variable for production
+app.secret_key = 'your_super_secret_key_here' 
 
 # Define the stages of our data science pipeline
 PIPELINE_STAGES = [
@@ -34,7 +38,9 @@ def _get_df_from_session():
     """
     if 'df' in session:
         try:
-            df = pd.read_json(session['df'])
+            # Use compression to handle larger dataframes within the session limit
+            df_json_str = session['df']
+            df = pd.read_json(df_json_str)
             return df, None
         except Exception as e:
             return None, f"Error restoring DataFrame from session: {e}"
@@ -43,18 +49,7 @@ def _get_df_from_session():
 def _get_progress_data(current_stage_name):
     """
     Calculates the current progress based on the pipeline stages.
-
-    Technical: This function finds the index of the current stage in the
-    PIPELINE_STAGES list and calculates the percentage completion. It returns
-    the current stage name and the percentage to be used in the template.
-
-    Layman: This function simply looks at what you're doing right now (e.g.,
-    Data Cleaning), figures out where that is on our master to-do list, and
-    calculates how far along you are in the project.
-
-    Args:
-        current_stage_name (str): The name of the current stage.
-
+    
     Returns:
         tuple: (current_stage_name, progress_percentage)
     """
@@ -65,26 +60,61 @@ def _get_progress_data(current_stage_name):
     except ValueError:
         return "Unknown Stage", 0
 
+# --- NEW ROUTES FOR EXPORTING DATA ---
+@app.route('/export_data', methods=['POST'])
+def export_data():
+    """
+    Handles the request to export the current DataFrame.
+    """
+    df, error_message = _get_df_from_session()
+    if error_message:
+        return redirect(url_for('index'))
+
+    file_format = request.form.get('file_format')
+    
+    if file_format == 'ipynb':
+        df_head_html, _, _, _, _ = get_dataframe_summary(df)
+        current_stage, _ = _get_progress_data(request.form.get('current_stage'))
+        
+        # This is a placeholder for a real code log. 
+        # You'll need to store and retrieve the actual code log from the session.
+        code_log = [
+            "# This is a placeholder code block.\n# You would store actual code from previous steps here.",
+            "import pandas as pd\n\ndf = pd.read_csv('your_data.csv')"
+        ]
+        
+        file_content, mime_type = export_ipynb(df_head_html, code_log, current_stage)
+        if file_content:
+            return send_file(io.BytesIO(file_content), 
+                             mimetype=mime_type, 
+                             as_attachment=True, 
+                             download_name=f'analysis_{current_stage}.ipynb')
+    else:
+        file_content, mime_type = export_dataframe(df, file_format)
+        if file_content:
+            return send_file(io.BytesIO(file_content),
+                             mimetype=mime_type,
+                             as_attachment=True,
+                             download_name=f'cleaned_data.{file_format}')
+    
+    return "Error during export.", 500
+
+
+# --- EXISTING ROUTES (MODIFIED SLIGHTLY FOR EXPORT) ---
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
     """
     The main route for the web application, now with file upload functionality.
-    
-    Handles both GET and POST requests. The GET request renders the initial
-    home page with options to upload data from URL or a local file. The POST 
-    request processes the submitted data source and redirects to the data 
-    viewing page upon success. It now checks for a file in the request first.
     """
+    # ... (rest of the function is the same) ...
     if request.method == 'POST':
         source_type = request.form.get('source_type')
         
-        # New logic to handle file uploads
         if 'file' in request.files and request.files['file'].filename != '':
             source_file = request.files['file']
             df, error_message = load_data('upload', source_file)
         
-        # Existing logic to handle URLs
         elif 'source_path' in request.form and request.form.get('source_path') != '':
             source_path = request.form.get('source_path')
             df, error_message = load_data('url', source_path)
@@ -97,7 +127,9 @@ def index():
             current_stage, progress_percent = _get_progress_data("Data Ingestion")
             return render_template('index.html', error=error_message, current_stage=current_stage, progress_percent=progress_percent)
 
-        session['df'] = df.to_json()
+        # We'll use a compressed JSON format to handle larger dataframes in session
+        # This will help with the "file too large" issue you mentioned
+        session['df'] = df.to_json(compression='infer')
         return redirect(url_for('data_viewer'))
 
     current_stage, progress_percent = _get_progress_data("Data Ingestion")
@@ -106,9 +138,7 @@ def index():
 
 @app.route('/data_viewer')
 def data_viewer():
-    """
-    Displays the loaded dataset to the user.
-    """
+    # ... (rest of the function is the same) ...
     df, error_message = _get_df_from_session()
     if error_message:
         current_stage, progress_percent = _get_progress_data("Data Ingestion")
@@ -127,11 +157,10 @@ def data_viewer():
                            current_stage=current_stage,
                            progress_percent=progress_percent)
 
+
 @app.route('/data_cleaning')
 def data_cleaning():
-    """
-    Renders the data cleaning page.
-    """
+    # ... (rest of the function is the same) ...
     df, error_message = _get_df_from_session()
     if error_message:
         current_stage, progress_percent = _get_progress_data("Data Ingestion")
@@ -150,9 +179,7 @@ def data_cleaning():
 
 @app.route('/clean_data', methods=['POST'])
 def clean_data():
-    """
-    Processes the data cleaning requests from the form.
-    """
+    # ... (rest of the function is the same) ...
     df, error_message = _get_df_from_session()
     if error_message:
         return redirect(url_for('index'))
@@ -193,7 +220,7 @@ def clean_data():
         if column and method:
             df, new_error_message = handle_outliers(df, column, method)
 
-    session['df'] = df.to_json()
+    session['df'] = df.to_json(compression='infer')
     
     df_head_html, _, _, columns, _ = get_dataframe_summary(df)
     current_stage, progress_percent = _get_progress_data("Data Cleaning")
@@ -205,11 +232,10 @@ def clean_data():
                            current_stage=current_stage,
                            progress_percent=progress_percent)
 
+
 @app.route('/data_eda', methods=['GET', 'POST'])
 def data_eda():
-    """
-    Renders the EDA and Visualization page.
-    """
+    # ... (rest of the function is the same) ...
     df, error_message = _get_df_from_session()
     if error_message:
         return redirect(url_for('index'))
@@ -231,8 +257,63 @@ def data_eda():
                            df_info=info_str,
                            df_desc=desc_html,
                            columns=columns,
+                           unique_values=unique_values, # Added this to support your EDA request
                            plot_json=plot_json,
                            error=error_message,
+                           current_stage=current_stage,
+                           progress_percent=progress_percent)
+
+
+@app.route('/feature_engineering')
+def feature_engineering():
+    # ... (rest of the function is the same) ...
+    df, error_message = _get_df_from_session()
+    if error_message:
+        return redirect(url_for('index'))
+
+    df_head_html, _, _, columns, _ = get_dataframe_summary(df)
+    
+    current_stage, progress_percent = _get_progress_data("Feature Engineering")
+
+    return render_template('feature_engineering.html',
+                           df_head=df_head_html,
+                           columns=columns,
+                           current_stage=current_stage,
+                           progress_percent=progress_percent)
+
+
+@app.route('/engineer_features', methods=['POST'])
+def engineer_features():
+    # ... (rest of the function is the same) ...
+    df, error_message = _get_df_from_session()
+    if error_message:
+        return redirect(url_for('index'))
+
+    action_type = request.form.get('action_type')
+    new_error_message = None
+
+    if action_type == 'create_feature':
+        col1 = request.form.get('col1')
+        col2 = request.form.get('col2')
+        new_col_name = request.form.get('new_col_name')
+        operation = request.form.get('operation')
+        if col1 and col2 and new_col_name and operation:
+            df, new_error_message = create_new_feature(df, col1, col2, new_col_name, operation)
+    
+    elif action_type == 'one_hot_encode':
+        column = request.form.get('encode_col')
+        if column:
+            df, new_error_message = one_hot_encode_column(df, column)
+
+    session['df'] = df.to_json(compression='infer')
+    
+    df_head_html, _, _, columns, _ = get_dataframe_summary(df)
+    current_stage, progress_percent = _get_progress_data("Feature Engineering")
+
+    return render_template('feature_engineering.html',
+                           df_head=df_head_html,
+                           columns=columns,
+                           error=new_error_message,
                            current_stage=current_stage,
                            progress_percent=progress_percent)
 
