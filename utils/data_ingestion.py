@@ -86,3 +86,25 @@ def load_data(source_type, source_path):
         error_message = f"An unexpected error occurred: {e}"
     
     return df, error_message
+
+
+
+def get_dataframe_summary(df):
+    """
+    Generates a descriptive summary of the dataframe.
+
+    Args:
+        df (pd.DataFrame): The dataframe to summarize.
+
+    Returns:
+        tuple: (df_head_html, df_info_str, df_desc_html, columns, unique_values)
+    """
+    info_buffer = pd.io.common.StringIO()
+    df.info(buf=info_buffer)
+    info_str = info_buffer.getvalue()
+
+    desc_html = df.describe(include='all').to_html(classes='table table-striped table-bordered')
+    unique_values = {col: df[col].unique().tolist()[:10] for col in df.columns}
+    df_head_html = df.head().to_html(classes='table table-striped table-bordered')
+
+    return df_head_html, info_str, desc_html, df.columns.tolist(), unique_values
