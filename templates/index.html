@@ -2,19 +2,18 @@
 
 {% block content %}
 <div class="row">
-    <div class="col-md-8 offset-md-2">
+    <div class="col-md-12">
         <div class="card shadow-sm">
             <div class="card-header bg-primary text-white">
-                <h4>Upload Your Dataset</h4>
+                <h4>Phase 1: Data Ingestion</h4>
                 <p class="mb-0">
-                    <span class="fw-bold">Technical:</span>
-                    This is the entry point for data ingestion. The application supports various data sources 
-                    and formats (CSV, XLSX) and uses robust error handling to ensure data integrity before proceeding.
+                    <span class="fw-bold">Technical:</span> This module provides a flexible interface for loading
+                    data from various sources, including remote URLs (GitHub, Google Drive) and local file
+                    uploads. It supports common formats like CSV and Excel.
                     <br>
-                    <span class="fw-bold">Layman:</span>
-                    Here's where you start. Just tell us where your data is, and we'll handle the rest. We can 
-                    get it from your computer, a website link, or even a Google Drive link. Don't worry if there's 
-                    a problem; the app will let you know.
+                    <span class="fw-bold">Layman:</span> This is the starting point of our project. You'll either
+                    paste a link to your dataset or upload a file from your computer. Once the data is loaded,
+                    we'll move on to the next phase.
                 </p>
             </div>
             <div class="card-body">
@@ -23,20 +22,49 @@
                     {{ error }}
                 </div>
                 {% endif %}
-                <form action="{{ url_for('index') }}" method="post" class="mt-3">
-                    <div class="mb-3">
-                        <label for="source_type" class="form-label">Data Source Type</label>
-                        <select class="form-select" id="source_type" name="source_type">
-                            <option value="url" selected>URL (GitHub, Raw Link)</option>
-                            <option value="gdrive">Google Drive Link</option>
-                            </select>
+
+                <ul class="nav nav-tabs" id="ingestionTab" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="url-tab" data-bs-toggle="tab" data-bs-target="#url" type="button" role="tab" aria-controls="url" aria-selected="true">Load from URL</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="upload-tab" data-bs-toggle="tab" data-bs-target="#upload" type="button" role="tab" aria-controls="upload" aria-selected="false">Upload File</button>
+                    </li>
+                </ul>
+                <div class="tab-content" id="ingestionTabContent">
+                    <div class="tab-pane fade show active" id="url" role="tabpanel" aria-labelledby="url-tab">
+                        <form action="{{ url_for('index') }}" method="post" class="mt-3">
+                            <input type="hidden" name="source_type" value="url">
+                            <div class="mb-3">
+                                <label for="source_path" class="form-label">Enter Dataset URL</label>
+                                <input type="text" class="form-control" id="source_path" name="source_path"
+                                    placeholder="e.g., https://raw.githubusercontent.com/.../data.csv">
+                                <div class="form-text">
+                                    Supported URLs:
+                                    <ul>
+                                        <li>Raw GitHub links</li>
+                                        <li>Standard GitHub links (auto-converted to raw)</li>
+                                        <li>Google Drive shared links for Sheets or CSV/XLSX files</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100">Load Dataset</button>
+                        </form>
                     </div>
-                    <div class="mb-3">
-                        <label for="source_path" class="form-label">URL or Link</label>
-                        <input type="text" class="form-control" id="source_path" name="source_path" placeholder="e.g., https://raw.githubusercontent.com/user/repo/file.csv">
+                    <div class="tab-pane fade" id="upload" role="tabpanel" aria-labelledby="upload-tab">
+                        <form action="{{ url_for('index') }}" method="post" enctype="multipart/form-data" class="mt-3">
+                            <input type="hidden" name="source_type" value="upload">
+                            <div class="mb-3">
+                                <label for="file" class="form-label">Choose a File</label>
+                                <input type="file" class="form-control" id="file" name="file" accept=".csv, .xls, .xlsx">
+                                <div class="form-text">
+                                    Supported formats: .csv, .xlsx, .xls
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100">Upload Dataset</button>
+                        </form>
                     </div>
-                    <button type="submit" class="btn btn-primary w-100">Load Dataset</button>
-                </form>
+                </div>
             </div>
         </div>
     </div>
