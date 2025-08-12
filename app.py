@@ -6,7 +6,10 @@ from utils.data_cleaning import (
     handle_missing_values, rename_column, convert_dtype, 
     remove_duplicates, standardize_text, handle_outliers, correct_inconsistencies
 )
-from utils.data_engineering import apply_encoding, remove_outliers
+from utils.data_engineering import (
+    create_new_feature, apply_encoding, scale_features, rename_and_drop_columns
+)
+from utils.data_visualization import generate_plot
 import pandas as pd
 import numpy as np
 import io
@@ -45,54 +48,58 @@ def _get_progress_data(current_stage_name):
     """
     Calculates the current progress based on the pipeline stages.
 
+    Args:
+        current_stage_name (str): The name of the current stage.
+
     Returns:
-        tuple: A tuple containing the current stage name and progress percentage.
+        tuple: The current stage name and the progress percentage.
     """
     try:
         current_index = PIPELINE_STAGES.index(current_stage_name)
-        progress_percent = int((current_index / (len(PIPELINE_STAGES) - 1)) * 100)
+        progress_percent = int(((current_index + 1) / len(PIPELINE_STAGES)) * 100)
     except ValueError:
+        current_index = 0
         progress_percent = 0
     return current_stage_name, progress_percent
+
+def _save_df_to_session(df):
+    """
+    Helper function to safely save the DataFrame to the session.
+    """
+    session['df'] = df.to_json()
+
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
     """
-    Handles the data ingestion phase.
+    Handles the data ingestion stage, allowing users to upload a file or
+    provide a URL.
     """
     error_message = None
     if request.method == 'POST':
         source_type = request.form.get('source_type')
+        
         if source_type == 'url':
             url = request.form.get('url')
-            if url:
-                df, error_message = load_data(url=url)
-                if df is not None:
-                    session['df'] = df.to_json()
-                    return redirect(url_for('data_viewer'))
-            else:
-                error_message = "Please provide a valid URL."
+            df, error_message = load_data(url=url)
         elif source_type == 'upload':
             file = request.files.get('file')
-            if file:
-                df, error_message = load_data(file=file)
-                if df is not None:
-                    session['df'] = df.to_json()
-                    return redirect(url_for('data_viewer'))
-            else:
-                error_message = "Please select a file to upload."
-    
+            df, error_message = load_data(file=file)
+        else:
+            df = None
+            error_message = "Invalid data source type."
+
+        if df is not None:
+            _save_df_to_session(df)
+            return redirect(url_for('data_viewer'))
+
     current_stage, progress_percent = _get_progress_data("Data Ingestion")
-    
-    return render_template('index.html', 
-                           error=error_message, 
-                           current_stage=current_stage, 
-                           progress_percent=progress_percent)
+    return render_template('index.html', error=error_message, current_stage=current_stage, progress_percent=progress_percent)
 
 @app.route('/data_viewer')
 def data_viewer():
     """
-    Renders the data viewing page with a summary of the loaded DataFrame.
+    Displays a summary of the loaded DataFrame.
     """
     df, error_message = _get_df_from_session()
     if error_message:
@@ -100,79 +107,96 @@ def data_viewer():
 
     df_head_html, info_str, desc_html, columns, unique_values = get_dataframe_summary(df)
 
-    current_stage, progress_percent = _get_progress_data("Data Ingestion")
-
+    current_stage, progress_percent = _get_progress_data("Data Cleaning")
+    
     return render_template('data_viewer.html',
                            df_head=df_head_html,
                            df_info=info_str,
                            df_desc=desc_html,
-                           columns=columns,
                            unique_values=unique_values,
+                           columns=columns,
                            current_stage=current_stage,
                            progress_percent=progress_percent)
+
 
 @app.route('/data_cleaning', methods=['GET', 'POST'])
 def data_cleaning():
     """
-    Renders the data cleaning page and handles cleaning operations.
+    Renders the Data Cleaning page and handles data cleaning operations.
     """
     df, error_message = _get_df_from_session()
     if error_message:
         return redirect(url_for('index'))
 
     new_error_message = None
+    success_message = None
 
     if request.method == 'POST':
         action = request.form.get('action')
-        columns_to_process = request.form.getlist('columns')
         
-        if not columns_to_process:
-            new_error_message = "Please select at least one column."
-        else:
-            if action == 'missing_values':
-                strategy = request.form.get('strategy')
-                df = handle_missing_values(df, columns_to_process, strategy)
-            elif action == 'rename_column':
-                old_col = request.form.get('old_col')
-                new_col = request.form.get('new_col')
-                if old_col and new_col:
-                    df = rename_column(df, old_col, new_col)
-                else:
-                    new_error_message = "Please provide both old and new column names."
-            elif action == 'convert_dtype':
-                dtype_col = request.form.get('dtype_col')
-                new_dtype = request.form.get('new_dtype')
-                if dtype_col and new_dtype:
-                    df, new_error_message = convert_dtype(df, dtype_col, new_dtype)
-                else:
-                    new_error_message = "Please select a column and a data type."
-            elif action == 'remove_duplicates':
-                df = remove_duplicates(df, columns_to_process)
-            elif action == 'standardize_text':
-                standardize_col = request.form.get('standardize_col')
-                if standardize_col:
-                    df = standardize_text(df, standardize_col)
-                else:
-                    new_error_message = "Please select a column to standardize."
-            elif action == 'handle_outliers':
-                outlier_col = request.form.get('outlier_col')
-                outlier_method = request.form.get('outlier_method')
-                if outlier_col and outlier_method:
-                    df, new_error_message = handle_outliers(df, outlier_col, outlier_method)
-                else:
-                    new_error_message = "Please select a column and a method."
-            elif action == 'correct_inconsistencies':
-                inconsist_col = request.form.get('inconsist_col')
-                mapping_str = request.form.get('mapping_dict')
-                try:
-                    mapping_dict = eval(mapping_str)
-                    df, new_error_message = correct_inconsistencies(df, inconsist_col, mapping_dict)
-                except Exception as e:
-                    new_error_message = f"Invalid dictionary format: {e}"
+        if action == 'handle_missing':
+            columns = request.form.getlist('missing_cols')
+            strategy = request.form.get('missing_strategy')
+            df_cleaned = handle_missing_values(df, columns, strategy)
+            if df_cleaned is not None:
+                _save_df_to_session(df_cleaned)
+                df = df_cleaned
+                success_message = f"Missing values handled successfully using '{strategy}' strategy."
+            else:
+                new_error_message = "Failed to handle missing values. Please check your selections."
 
-            session['df'] = df.to_json()
-    
-    df_head_html, _, _, columns, _ = get_dataframe_summary(df)
+        elif action == 'convert_dtype':
+            column = request.form.get('dtype_col')
+            dtype = request.form.get('new_dtype')
+            df_cleaned, new_error_message = convert_dtype(df, column, dtype)
+            if df_cleaned is not None:
+                _save_df_to_session(df_cleaned)
+                df = df_cleaned
+                success_message = f"Column '{column}' converted to '{dtype}' successfully."
+            
+        elif action == 'remove_duplicates':
+            df_cleaned = remove_duplicates(df)
+            _save_df_to_session(df_cleaned)
+            df = df_cleaned
+            success_message = "Duplicate rows removed successfully."
+        
+        elif action == 'standardize_text':
+            column = request.form.get('text_col')
+            case = request.form.get('text_case')
+            df_cleaned, new_error_message = standardize_text(df, column, case)
+            if df_cleaned is not None:
+                _save_df_to_session(df_cleaned)
+                df = df_cleaned
+                success_message = f"Text in column '{column}' standardized to '{case}' case successfully."
+
+        elif action == 'handle_outliers':
+            column = request.form.get('outlier_col')
+            method = request.form.get('outlier_method')
+            df_cleaned, new_error_message = handle_outliers(df, column, method)
+            if df_cleaned is not None:
+                _save_df_to_session(df_cleaned)
+                df = df_cleaned
+                success_message = f"Outliers in column '{column}' handled successfully using '{method}' method."
+        
+        elif action == 'correct_inconsistencies':
+            column = request.form.get('inconsistency_col')
+            mapping_str = request.form.get('mapping_dict')
+            try:
+                mapping_dict = eval(mapping_str)
+                if not isinstance(mapping_dict, dict):
+                    raise ValueError("Input is not a valid dictionary.")
+                df_cleaned, new_error_message = correct_inconsistencies(df, column, mapping_dict)
+                if df_cleaned is not None:
+                    _save_df_to_session(df_cleaned)
+                    df = df_cleaned
+                    success_message = f"Inconsistencies in column '{column}' corrected successfully."
+            except Exception as e:
+                new_error_message = f"Error with mapping dictionary: {e}"
+        
+        df_head_html, _, _, columns, _ = get_dataframe_summary(df)
+        
+    else:
+        df_head_html, _, _, columns, _ = get_dataframe_summary(df)
 
     current_stage, progress_percent = _get_progress_data("Data Cleaning")
 
@@ -180,8 +204,10 @@ def data_cleaning():
                            df_head=df_head_html,
                            columns=columns,
                            error=new_error_message,
+                           success=success_message,
                            current_stage=current_stage,
                            progress_percent=progress_percent)
+
 
 @app.route('/data_eda', methods=['GET', 'POST'])
 def data_eda():
@@ -211,56 +237,77 @@ def data_eda():
                            columns=columns,
                            plot_json=plot_json,
                            error=error_message,
+                           unique_values=unique_values,
                            current_stage=current_stage,
                            progress_percent=progress_percent)
 
-@app.route('/feature_engineering', methods=['GET', 'POST'])
-def feature_engineering():
+
+@app.route('/data_engineering', methods=['GET', 'POST'])
+def data_engineering():
     """
-    Renders the feature engineering page and handles encoding operations.
+    Renders the Feature Engineering page and handles operations.
     """
     df, error_message = _get_df_from_session()
     if error_message:
         return redirect(url_for('index'))
-    
+
     new_error_message = None
+    success_message = None
     
     if request.method == 'POST':
-        encoding_type = request.form.get('encoding_type')
-        columns_to_encode = request.form.getlist('columns')
+        action = request.form.get('action')
         
-        if not columns_to_encode:
-            new_error_message = "Please select at least one column to encode."
-        else:
-            df, new_error_message = apply_encoding(df, columns_to_encode, encoding_type)
-            session['df'] = df.to_json()
-    
-    df_head_html, info_str, desc_html, columns, unique_values = get_dataframe_summary(df)
+        if action == 'create_feature':
+            col1 = request.form.get('col1')
+            col2 = request.form.get('col2')
+            operation = request.form.get('operation')
+            new_col_name = request.form.get('new_col_name')
+            df_engineered, new_error_message = create_new_feature(df, col1, col2, operation, new_col_name)
+            if df_engineered is not None:
+                _save_df_to_session(df_engineered)
+                df = df_engineered
+                success_message = f"New feature '{new_col_name}' created successfully."
+
+        elif action == 'apply_encoding':
+            columns = request.form.getlist('columns')
+            encoding_type = request.form.get('encoding_type')
+            df_engineered, new_error_message = apply_encoding(df, columns, encoding_type)
+            if df_engineered is not None:
+                _save_df_to_session(df_engineered)
+                df = df_engineered
+                success_message = f"Columns {columns} encoded using '{encoding_type}' successfully."
+
+        elif action == 'scale_features':
+            columns = request.form.getlist('columns')
+            scaler_type = request.form.get('scaler_type')
+            df_engineered, new_error_message = scale_features(df, columns, scaler_type)
+            if df_engineered is not None:
+                _save_df_to_session(df_engineered)
+                df = df_engineered
+                success_message = f"Columns {columns} scaled using '{scaler_type}' successfully."
+
+        elif action == 'rename_drop':
+            old_col_name = request.form.get('old_column_name')
+            new_col_name = request.form.get('new_column_name')
+            columns_to_drop = request.form.getlist('columns_to_drop')
+            df_engineered, new_error_message = rename_and_drop_columns(df, new_column_name, old_col_name, columns_to_drop)
+            if df_engineered is not None:
+                _save_df_to_session(df_engineered)
+                df = df_engineered
+                success_message = "Columns renamed/dropped successfully."
+        
+        df_head_html, _, _, columns, _ = get_dataframe_summary(df)
+
+    else:
+        df_head_html, _, _, columns, _ = get_dataframe_summary(df)
 
     current_stage, progress_percent = _get_progress_data("Feature Engineering")
 
-    return render_template('feature_engineering.html',
+    return render_template('data_engineering.html',
                            df_head=df_head_html,
                            columns=columns,
                            error=new_error_message,
-                           current_stage=current_stage,
-                           progress_percent=progress_percent)
-
-@app.route('/model_building')
-def model_building():
-    """
-    Renders a placeholder for the model building stage.
-    """
-    df, error_message = _get_df_from_session()
-    if error_message:
-        return redirect(url_for('index'))
-    
-    df_head_html, _, _, _, _ = get_dataframe_summary(df)
-    
-    current_stage, progress_percent = _get_progress_data("Model Building")
-
-    return render_template('model_building.html',
-                           df_head=df_head_html,
+                           success=success_message,
                            current_stage=current_stage,
                            progress_percent=progress_percent)
 
