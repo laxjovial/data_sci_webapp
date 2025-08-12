@@ -1,14 +1,13 @@
-#the main entry point 
 # app.py
 
 from flask import Flask, render_template, request, redirect, url_for, session
-from utils.data_ingestion import load_data
-import pandas as pd
-import numpy as np
 from utils.data_ingestion import load_data, get_dataframe_summary
 from utils.data_cleaning import handle_missing_values, rename_column, convert_dtype
+import pandas as pd
+import numpy as np
 
-# app.py (add this after the imports)
+app = Flask(__name__)
+app.secret_key = 'your_super_secret_key_here' # For session management
 
 # Define the stages of our data science pipeline
 PIPELINE_STAGES = [
@@ -21,13 +20,47 @@ PIPELINE_STAGES = [
     "Export & Finalization"
 ]
 
+def _get_df_from_session():
+    """
+    Helper function to safely retrieve the DataFrame from the session.
+    
+    Returns:
+        pd.DataFrame: The DataFrame from the session.
+        str: An error message if the DataFrame is not found, otherwise None.
+    """
+    if 'df' in session:
+        try:
+            df = pd.read_json(session['df'])
+            return df, None
+        except Exception as e:
+            return None, f"Error restoring DataFrame from session: {e}"
+    return None, "No dataset loaded. Please go back to the home page to upload one."
 
-app = Flask(__name__)
-app.secret_key = 'your_super_secret_key_here' # For session management
+def _get_progress_data(current_stage_name):
+    """
+    Calculates the current progress based on the pipeline stages.
 
-# A global variable to store the DataFrame across user sessions
-# NOTE: In a production app, we would use a more robust solution, but this is fine for now.
-# We will use the Flask session to handle this for a single user's experience.
+    Technical: This function finds the index of the current stage in the
+    PIPELINE_STAGES list and calculates the percentage completion. It returns
+    the current stage name and the percentage to be used in the template.
+
+    Layman: This function simply looks at what you're doing right now (e.g.,
+    Data Cleaning), figures out where that is on our master to-do list, and
+    calculates how far along you are in the project.
+
+    Args:
+        current_stage_name (str): The name of the current stage.
+
+    Returns:
+        tuple: (current_stage_name, progress_percentage)
+    """
+    try:
+        current_index = PIPELINE_STAGES.index(current_stage_name)
+        progress_percent = int(((current_index + 1) / len(PIPELINE_STAGES)) * 100)
+        return current_stage_name, progress_percent
+    except ValueError:
+        return "Unknown Stage", 0
+
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -57,13 +90,16 @@ def index():
         df, error_message = load_data(source_type, source_path)
         
         if error_message:
-            return render_template('index.html', error=error_message)
+            current_stage, progress_percent = _get_progress_data("Data Ingestion")
+            return render_template('index.html', error=error_message, current_stage=current_stage, progress_percent=progress_percent)
 
         # Store DataFrame in session to access it in other routes
         session['df'] = df.to_json()
         return redirect(url_for('data_viewer'))
 
-    return render_template('index.html')
+    current_stage, progress_percent = _get_progress_data("Data Ingestion")
+    return render_template('index.html', current_stage=current_stage, progress_percent=progress_percent)
+
 
 @app.route('/data_viewer')
 def data_viewer():
@@ -85,45 +121,21 @@ def data_viewer():
     """
     df, error_message = _get_df_from_session()
     if error_message:
-        return render_template('index.html', error=error_message)
+        current_stage, progress_percent = _get_progress_data("Data Ingestion")
+        return render_template('index.html', error=error_message, current_stage=current_stage, progress_percent=progress_percent)
 
-    # Convert pandas info to a readable string
-    info_buffer = pd.io.common.StringIO()
-    df.info(buf=info_buffer)
-    info_str = info_buffer.getvalue()
+    df_head_html, info_str, desc_html, columns, unique_values = get_dataframe_summary(df)
 
-    # Get descriptive statistics
-    desc_html = df.describe(include='all').to_html(classes='table table-striped table-bordered')
-
-    # Get unique values for each column
-    unique_values = {col: df[col].unique().tolist()[:10] for col in df.columns}
+    current_stage, progress_percent = _get_progress_data("Data Ingestion")
     
-    # Get the head of the DataFrame
-    df_head_html = df.head().to_html(classes='table table-striped table-bordered')
-
     return render_template('data_viewer.html', 
                            df_head=df_head_html,
                            df_info=info_str,
                            df_desc=desc_html,
-                           columns=df.columns.tolist(),
-                           unique_values=unique_values)
-
-def _get_df_from_session():
-    """
-    Helper function to safely retrieve the DataFrame from the session.
-    
-    Returns:
-        pd.DataFrame: The DataFrame from the session.
-        str: An error message if the DataFrame is not found, otherwise None.
-    """
-    if 'df' in session:
-        try:
-            df = pd.read_json(session['df'])
-            return df, None
-        except Exception as e:
-            return None, f"Error restoring DataFrame from session: {e}"
-    return None, "No dataset loaded. Please go back to the home page to upload one."
-
+                           columns=columns,
+                           unique_values=unique_values,
+                           current_stage=current_stage,
+                           progress_percent=progress_percent)
 
 @app.route('/data_cleaning')
 def data_cleaning():
@@ -139,12 +151,18 @@ def data_cleaning():
     """
     df, error_message = _get_df_from_session()
     if error_message:
-        return render_template('index.html', error=error_message)
+        current_stage, progress_percent = _get_progress_data("Data Ingestion")
+        return redirect(url_for('index'))
 
     df_head_html, _, _, columns, _ = get_dataframe_summary(df)
+    
+    current_stage, progress_percent = _get_progress_data("Data Cleaning")
+
     return render_template('data_cleaning.html',
                            df_head=df_head_html,
-                           columns=columns)
+                           columns=columns,
+                           current_stage=current_stage,
+                           progress_percent=progress_percent)
 
 
 @app.route('/clean_data', methods=['POST'])
@@ -188,42 +206,16 @@ def clean_data():
 
     session['df'] = df.to_json()
     
-    # Redirect back to the cleaning page
     df_head_html, _, _, columns, _ = get_dataframe_summary(df)
+    current_stage, progress_percent = _get_progress_data("Data Cleaning")
+
     return render_template('data_cleaning.html',
                            df_head=df_head_html,
                            columns=columns,
-                           error=new_error_message)
-
-# app.py (add this new helper function)
-
-def _get_progress_data(current_stage_name):
-    """
-    Calculates the current progress based on the pipeline stages.
-
-    Technical: This function finds the index of the current stage in the
-    PIPELINE_STAGES list and calculates the percentage completion. It returns
-    the current stage name and the percentage to be used in the template.
-
-    Layman: This function simply looks at what you're doing right now (e.g.,
-    Data Cleaning), figures out where that is on our master to-do list, and
-    calculates how far along you are in the project.
-
-    Args:
-        current_stage_name (str): The name of the current stage.
-
-    Returns:
-        tuple: (current_stage_name, progress_percentage)
-    """
-    try:
-        current_index = PIPELINE_STAGES.index(current_stage_name)
-        progress_percent = int(((current_index + 1) / len(PIPELINE_STAGES)) * 100)
-        return current_stage_name, progress_percent
-    except ValueError:
-        return "Unknown Stage", 0
+                           error=new_error_message,
+                           current_stage=current_stage,
+                           progress_percent=progress_percent)
 
 
 if __name__ == '__main__':
     app.run(debug=True)
-
-
