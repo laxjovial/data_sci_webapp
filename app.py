@@ -195,6 +195,33 @@ def clean_data():
                            columns=columns,
                            error=new_error_message)
 
+# app.py (add this new helper function)
+
+def _get_progress_data(current_stage_name):
+    """
+    Calculates the current progress based on the pipeline stages.
+
+    Technical: This function finds the index of the current stage in the
+    PIPELINE_STAGES list and calculates the percentage completion. It returns
+    the current stage name and the percentage to be used in the template.
+
+    Layman: This function simply looks at what you're doing right now (e.g.,
+    Data Cleaning), figures out where that is on our master to-do list, and
+    calculates how far along you are in the project.
+
+    Args:
+        current_stage_name (str): The name of the current stage.
+
+    Returns:
+        tuple: (current_stage_name, progress_percentage)
+    """
+    try:
+        current_index = PIPELINE_STAGES.index(current_stage_name)
+        progress_percent = int(((current_index + 1) / len(PIPELINE_STAGES)) * 100)
+        return current_stage_name, progress_percent
+    except ValueError:
+        return "Unknown Stage", 0
+
 
 if __name__ == '__main__':
     app.run(debug=True)
