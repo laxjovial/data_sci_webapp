@@ -1,85 +1,110 @@
 # utils/data_engineering.py
+
 import pandas as pd
+from sklearn.preprocessing import LabelEncoder, OrdinalEncoder, OneHotEncoder
 
-def create_new_feature(df, col1, col2, new_col_name, operation):
+def apply_encoding(df, columns, encoding_type):
     """
-    Creates a new feature by combining two existing columns with a mathematical operation.
+    Applies various encoding techniques to specified categorical columns.
 
-    Technical: This function takes two column names, a new name for the resulting
-    column, and a specified operation ('add', 'subtract', 'multiply', 'divide').
-    It performs the operation on the specified columns and adds the result as
-    a new column in the DataFrame. It includes error handling for invalid operations
-    or non-numeric data.
+    Technical: This function provides a unified interface for several encoding
+    methods. Label Encoding is for binary or ordinal data. Ordinal Encoding
+    is for converting categorical strings to integers. One-Hot Encoding
+    creates new binary columns for each category. Frequency Encoding replaces
+    categories with their frequency in the dataset.
 
-    Layman: This lets you create a new, smart column. For example, if you have
-    a 'Length' and a 'Width' column, you can multiply them together to create
-    a new 'Area' column. This helps find new patterns in your data.
+    Layman: This is where we turn text-based categories (like 'car' or 'radio/TV')
+    into numbers that a computer can understand. We have different ways to do this,
+    depending on whether the categories have a natural order or not.
 
     Args:
         df (pd.DataFrame): The input DataFrame.
-        col1 (str): The name of the first column.
-        col2 (str): The name of the second column.
-        new_col_name (str): The name of the new column to be created.
-        operation (str): The mathematical operation to perform ('add', 'subtract', 'multiply', 'divide').
+        columns (list): A list of column names to encode.
+        encoding_type (str): The type of encoding to apply.
+                             ('one_hot', 'label', 'ordinal', 'frequency')
 
     Returns:
-        tuple: (pd.DataFrame, str) The modified DataFrame and an error message (if any).
+        tuple: The DataFrame with encoded columns and an error message (if any).
     """
-    df_engineered = df.copy()
-    try:
-        if operation == 'add':
-            df_engineered[new_col_name] = df_engineered[col1] + df_engineered[col2]
-        elif operation == 'subtract':
-            df_engineered[new_col_name] = df_engineered[col1] - df_engineered[col2]
-        elif operation == 'multiply':
-            df_engineered[new_col_name] = df_engineered[col1] * df_engineered[col2]
-        elif operation == 'divide':
-            # Handle division by zero
-            df_engineered[new_col_name] = df_engineered[col1] / df_engineered[col2].replace(0, 1)
-        else:
-            return df, "Invalid operation specified. Please choose from 'add', 'subtract', 'multiply', 'divide'."
-        return df_engineered, None
-    except KeyError:
-        return df, "One or both of the specified columns were not found."
-    except TypeError:
-        return df, "The selected columns must contain numeric data to perform this operation."
-    except Exception as e:
-        return df, f"An unexpected error occurred: {e}"
+    df_encoded = df.copy()
+    error_message = None
+
+    if encoding_type == 'label':
+        # Label Encoding is best for binary categories like 'male'/'female'
+        # or when there's an implicit order
+        for col in columns:
+            if df_encoded[col].nunique() <= 2:
+                try:
+                    le = LabelEncoder()
+                    df_encoded[col] = le.fit_transform(df_encoded[col])
+                except Exception as e:
+                    error_message = f"Error applying Label Encoding to '{col}': {e}"
+                    return df, error_message
+            else:
+                error_message = "Label Encoding is recommended for binary columns. Use Ordinal or One-Hot for others."
+                return df, error_message
+                
+    elif encoding_type == 'ordinal':
+        # Ordinal Encoding is for categories with a clear order, like 'little' < 'moderate' < 'rich'
+        try:
+            oe = OrdinalEncoder()
+            df_encoded[columns] = oe.fit_transform(df_encoded[columns])
+        except Exception as e:
+            error_message = f"Error applying Ordinal Encoding: {e}"
+            return df, error_message
+    
+    elif encoding_type == 'one_hot':
+        # One-Hot Encoding is for nominal categories with no order.
+        # It creates a new column for each unique value.
+        try:
+            df_encoded = pd.get_dummies(df_encoded, columns=columns, drop_first=True)
+        except Exception as e:
+            error_message = f"Error applying One-Hot Encoding: {e}"
+            return df, error_message
+            
+    elif encoding_type == 'frequency':
+        # Frequency Encoding replaces categories with the proportion of their occurrence.
+        # It can be useful for tree-based models.
+        try:
+            for col in columns:
+                frequency_map = df_encoded[col].value_counts(normalize=True)
+                df_encoded[col] = df_encoded[col].map(frequency_map)
+        except Exception as e:
+            error_message = f"Error applying Frequency Encoding: {e}"
+            return df, error_message
+
+    else:
+        error_message = "Invalid encoding type selected."
+
+    return df_encoded, error_message
 
 
-def one_hot_encode_column(df, column):
+def remove_outliers(data, columns):
     """
-    Performs one-hot encoding on a specified categorical column.
+    Removes outliers from the specified columns of the dataframe using the IQR method.
+    
+    Technical: This function computes the Interquartile Range (IQR) for each
+    numeric column and removes rows where the values fall outside the
+    standard 1.5 * IQR from the first and third quartiles (Q1, Q3).
 
-    Technical: This function uses pandas' get_dummies() to convert a categorical
-    column into a series of binary columns. This is a standard practice for
-    preparing non-numeric data for machine learning models.
+    Layman: This is a way to get rid of extreme or unusual values that might
+    skew your analysis. We find a typical range for the data and remove any
+    data points that are too far away from that range.
 
-    Layman: If you have a column with categories like 'Red', 'Green', and 'Blue',
-    this creates new columns for each category (e.g., 'Color_Red', 'Color_Green')
-    and puts a '1' in the correct column for each row. This allows a computer to
-    understand the categories.
-
-    Args:
-        df (pd.DataFrame): The input DataFrame.
-        column (str): The name of the categorical column to encode.
+    Parameters:
+    data (pd.DataFrame): The dataframe to remove outliers from.
+    columns (list): List of columns to check for outliers.
 
     Returns:
-        tuple: (pd.DataFrame, str) The modified DataFrame and an error message (if any).
+    pd.DataFrame: Dataframe with outliers removed.
     """
-    df_engineered = df.copy()
-    try:
-        if column not in df_engineered.columns:
-            return df, f"Column '{column}' not found in the DataFrame."
-        
-        # Check if the column is a categorical type
-        if pd.api.types.is_numeric_dtype(df_engineered[column]):
-            return df, f"Column '{column}' is numeric and cannot be one-hot encoded."
+    df_cleaned = data.copy()
+    for col in columns:
+        Q1 = df_cleaned[col].quantile(0.25)
+        Q3 = df_cleaned[col].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        df_cleaned = df_cleaned[(df_cleaned[col] >= lower_bound) & (df_cleaned[col] <= upper_bound)]
 
-        dummies = pd.get_dummies(df_engineered[column], prefix=column, drop_first=True)
-        df_engineered = pd.concat([df_engineered, dummies], axis=1)
-        df_engineered = df_engineered.drop(column, axis=1)
-
-        return df_engineered, None
-    except Exception as e:
-        return df, f"An unexpected error occurred: {e}"
+    return df_cleaned, None
