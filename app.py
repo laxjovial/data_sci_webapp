@@ -6,6 +6,7 @@ from utils.data_cleaning import (
     handle_missing_values, rename_column, convert_dtype, 
     remove_duplicates, standardize_text, handle_outliers, correct_inconsistencies
 )
+from utils.data_visualization import generate_plot
 import pandas as pd
 import numpy as np
 
@@ -235,6 +236,44 @@ def clean_data():
                            current_stage=current_stage,
                            progress_percent=progress_percent)
 
+@app.route('/data_eda', methods=['GET', 'POST'])
+def data_eda():
+    """
+    Renders the EDA and Visualization page.
+    
+    Technical: Retrieves the DataFrame from the session. On a GET request, it renders
+    the page with statistical summaries and columns. On a POST request, it generates a 
+    plot based on user input and passes the plot JSON to the template.
+    
+    Layman: This is where we create charts and graphs. You can pick columns and a 
+    chart type, and the app will create a visual representation of your data, 
+    helping you spot trends and patterns.
+    """
+    df, error_message = _get_df_from_session()
+    if error_message:
+        return redirect(url_for('index'))
+
+    df_head_html, info_str, desc_html, columns, unique_values = get_dataframe_summary(df)
+
+    plot_json = None
+    if request.method == 'POST':
+        plot_type = request.form.get('plot_type')
+        x_col = request.form.get('x_col')
+        y_col = request.form.get('y_col')
+
+        plot_json, error_message = generate_plot(df, plot_type, x_col, y_col)
+
+    current_stage, progress_percent = _get_progress_data("EDA & Visualization")
+
+    return render_template('data_eda.html',
+                           df_head=df_head_html,
+                           df_info=info_str,
+                           df_desc=desc_html,
+                           columns=columns,
+                           plot_json=plot_json,
+                           error=error_message,
+                           current_stage=current_stage,
+                           progress_percent=progress_percent)
 
 if __name__ == '__main__':
     app.run(debug=True)
