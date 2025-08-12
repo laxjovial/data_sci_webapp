@@ -28,7 +28,7 @@
                         <button class="nav-link active" id="url-tab" data-bs-toggle="tab" data-bs-target="#url" type="button" role="tab" aria-controls="url" aria-selected="true">Load from URL</button>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="upload-tab" data-bs-toggle="tab" data-bs-target="#upload" type="button" role="tab" aria-controls="upload" aria-selected="false">Upload File</button>
+                        <button class="nav-link" id="upload-tab" data-bs-toggle="tab" data-bs-target="#upload" type="button" role="tab" aria-controls="upload" aria-selected="false">Upload a File</button>
                     </li>
                 </ul>
                 <div class="tab-content" id="ingestionTabContent">
@@ -36,13 +36,14 @@
                         <form action="{{ url_for('index') }}" method="post" class="mt-3">
                             <input type="hidden" name="source_type" value="url">
                             <div class="mb-3">
-                                <label for="source_path" class="form-label">Enter Dataset URL</label>
-                                <input type="text" class="form-control" id="source_path" name="source_path"
-                                    placeholder="e.g., https://raw.githubusercontent.com/.../data.csv">
+                                <label for="url-input" class="form-label">Dataset URL</label>
+                                <input type="url" class="form-control" id="url-input" name="url" placeholder="Paste a link to a CSV or Excel file" required>
                                 <div class="form-text">
-                                    Supported URLs:
+                                    <p class="mb-0">
+                                        **Supported Links:**
+                                    </p>
                                     <ul>
-                                        <li>Raw GitHub links</li>
+                                        <li>Raw GitHub URLs (e.g., `https://raw.githubusercontent.com/...`)</li>
                                         <li>Standard GitHub links (auto-converted to raw)</li>
                                         <li>Google Drive shared links for Sheets or CSV/XLSX files</li>
                                     </ul>
