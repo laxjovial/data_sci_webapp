@@ -8,7 +8,18 @@ import numpy as np
 from utils.data_ingestion import load_data, get_dataframe_summary
 from utils.data_cleaning import handle_missing_values, rename_column, convert_dtype
 
+# app.py (add this after the imports)
 
+# Define the stages of our data science pipeline
+PIPELINE_STAGES = [
+    "Data Ingestion",
+    "Data Cleaning",
+    "EDA & Visualization",
+    "Feature Engineering",
+    "Model Building",
+    "Model Evaluation",
+    "Export & Finalization"
+]
 
 
 app = Flask(__name__)
