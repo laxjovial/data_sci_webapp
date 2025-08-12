@@ -2,7 +2,10 @@
 
 from flask import Flask, render_template, request, redirect, url_for, session
 from utils.data_ingestion import load_data, get_dataframe_summary
-from utils.data_cleaning import handle_missing_values, rename_column, convert_dtype
+from utils.data_cleaning import (
+    handle_missing_values, rename_column, convert_dtype, 
+    remove_duplicates, standardize_text, handle_outliers, correct_inconsistencies
+)
 import pandas as pd
 import numpy as np
 
@@ -85,7 +88,8 @@ def index():
         source_path = request.form.get('source_path')
 
         if not source_path:
-            return render_template('index.html', error="Please provide a valid file path or URL.")
+            current_stage, progress_percent = _get_progress_data("Data Ingestion")
+            return render_template('index.html', error="Please provide a valid file path or URL.", current_stage=current_stage, progress_percent=progress_percent)
 
         df, error_message = load_data(source_type, source_path)
         
@@ -203,6 +207,21 @@ def clean_data():
         new_type = request.form.get('new_type')
         if column and new_type:
             df, new_error_message = convert_dtype(df, column, new_type)
+
+    elif action_type == 'remove_duplicates':
+        df = remove_duplicates(df)
+        new_error_message = "Duplicate rows have been removed."
+
+    elif action_type == 'standardize_text':
+        columns = request.form.getlist('standardize_cols')
+        if columns:
+            df = standardize_text(df, columns)
+    
+    elif action_type == 'handle_outliers':
+        column = request.form.get('outlier_col')
+        method = request.form.get('outlier_method')
+        if column and method:
+            df, new_error_message = handle_outliers(df, column, method)
 
     session['df'] = df.to_json()
     
