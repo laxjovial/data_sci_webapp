@@ -69,36 +69,34 @@ def _get_progress_data(current_stage_name):
 @app.route('/', methods=['GET', 'POST'])
 def index():
     """
-    The main route for the web application.
+    The main route for the web application, now with file upload functionality.
     
     Handles both GET and POST requests. The GET request renders the initial
-    home page with options to upload data. The POST request processes the
-    submitted data source and redirects to the data viewing page upon success.
-    
-    Technical: The route uses Flask's `request.method` to differentiate between
-    GET and POST requests. For POST, it retrieves form data, calls the
-    `load_data` utility, and stores the resulting DataFrame in the Flask session.
-    This allows the data to persist between page redirects for a single user.
-    
-    Layman: This is the app's starting point. When you first visit, it shows
-    you the page where you can upload your data. Once you submit a file or link,
-    it grabs that data and sends you to the next page to see it.
+    home page with options to upload data from URL or a local file. The POST 
+    request processes the submitted data source and redirects to the data 
+    viewing page upon success. It now checks for a file in the request first.
     """
     if request.method == 'POST':
         source_type = request.form.get('source_type')
-        source_path = request.form.get('source_path')
-
-        if not source_path:
-            current_stage, progress_percent = _get_progress_data("Data Ingestion")
-            return render_template('index.html', error="Please provide a valid file path or URL.", current_stage=current_stage, progress_percent=progress_percent)
-
-        df, error_message = load_data(source_type, source_path)
         
+        # New logic to handle file uploads
+        if 'file' in request.files and request.files['file'].filename != '':
+            source_file = request.files['file']
+            df, error_message = load_data('upload', source_file)
+        
+        # Existing logic to handle URLs
+        elif 'source_path' in request.form and request.form.get('source_path') != '':
+            source_path = request.form.get('source_path')
+            df, error_message = load_data('url', source_path)
+            
+        else:
+            current_stage, progress_percent = _get_progress_data("Data Ingestion")
+            return render_template('index.html', error="Please provide a valid file or URL.", current_stage=current_stage, progress_percent=progress_percent)
+
         if error_message:
             current_stage, progress_percent = _get_progress_data("Data Ingestion")
             return render_template('index.html', error=error_message, current_stage=current_stage, progress_percent=progress_percent)
 
-        # Store DataFrame in session to access it in other routes
         session['df'] = df.to_json()
         return redirect(url_for('data_viewer'))
 
@@ -110,19 +108,6 @@ def index():
 def data_viewer():
     """
     Displays the loaded dataset to the user.
-    
-    This page shows key information about the dataset and allows users to
-    view different parts of the DataFrame (head, tail, unique values).
-    
-    Technical: It retrieves the DataFrame from the Flask session, converts
-    it from JSON back to a pandas DataFrame, and then calculates various
-    statistics like .info(), .describe(), and unique values for display.
-    It uses a helper function `_get_df_from_session()` to ensure the DataFrame
-    is always available.
-    
-    Layman: This is your "control panel" for the data. After you upload it,
-    this page lets you see what's inside. You can check the first few rows,
-    get a summary of the data, and see a list of all the columns.
     """
     df, error_message = _get_df_from_session()
     if error_message:
@@ -146,13 +131,6 @@ def data_viewer():
 def data_cleaning():
     """
     Renders the data cleaning page.
-
-    Technical: Retrieves the current DataFrame from the session and prepares
-    the data for display in the cleaning interface. It shows a preview of
-    the data along with the available cleaning options.
-
-    Layman: This is the data "car wash" page. It shows you your data and gives
-    you tools to clean it, like fixing missing numbers or changing column names.
     """
     df, error_message = _get_df_from_session()
     if error_message:
@@ -174,15 +152,6 @@ def data_cleaning():
 def clean_data():
     """
     Processes the data cleaning requests from the form.
-
-    Technical: This route handles various cleaning actions based on the form
-    submission. It calls the appropriate function from `utils/data_cleaning.py`,
-    updates the DataFrame in the session, and redirects the user back to the
-    cleaning page with the new, cleaned data.
-
-    Layman: This is the engine that does the cleaning work. When you choose a
-    cleaning option and click "Apply," this part of the app makes the changes
-    and shows you the result right away.
     """
     df, error_message = _get_df_from_session()
     if error_message:
@@ -240,14 +209,6 @@ def clean_data():
 def data_eda():
     """
     Renders the EDA and Visualization page.
-    
-    Technical: Retrieves the DataFrame from the session. On a GET request, it renders
-    the page with statistical summaries and columns. On a POST request, it generates a 
-    plot based on user input and passes the plot JSON to the template.
-    
-    Layman: This is where we create charts and graphs. You can pick columns and a 
-    chart type, and the app will create a visual representation of your data, 
-    helping you spot trends and patterns.
     """
     df, error_message = _get_df_from_session()
     if error_message:
