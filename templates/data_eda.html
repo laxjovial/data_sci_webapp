@@ -1,1 +1,89 @@
+{% extends "base.html" %}
 
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-warning text-white">
+                <h4>Exploratory Data Analysis (EDA)</h4>
+                <p class="mb-0">
+                    <span class="fw-bold">Technical:</span> This module facilitates EDA by providing statistical 
+                    summaries and a robust visualization interface. Users can generate various plot types to 
+                    uncover patterns, trends, and relationships within the dataset.
+                    <br>
+                    <span class="fw-bold">Layman:</span> Now that your data is clean, let's explore it! This is 
+                    where we'll create charts and graphs to help you see what's really going on in your data.
+                </p>
+            </div>
+            <div class="card-body">
+                <ul class="nav nav-tabs" id="edaTab" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="stats-tab" data-bs-toggle="tab" data-bs-target="#stats" type="button" role="tab" aria-controls="stats" aria-selected="true">Descriptive Stats</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="viz-tab" data-bs-toggle="tab" data-bs-target="#viz" type="button" role="tab" aria-controls="viz" aria-selected="false">Create Visualization</button>
+                    </li>
+                </ul>
+                <div class="tab-content" id="edaTabContent">
+                    <div class="tab-pane fade show active" id="stats" role="tabpanel" aria-labelledby="stats-tab">
+                        <h5 class="mt-3">Dataset Information (`.info()`)</h5>
+                        <pre>{{ df_info }}</pre>
+                        <h5 class="mt-3">Descriptive Statistics (`.describe()`)</h5>
+                        {{ df_desc | safe }}
+                        <h5 class="mt-3">Current Dataset Preview</h5>
+                        {{ df_head | safe }}
+                    </div>
+                    <div class="tab-pane fade" id="viz" role="tabpanel" aria-labelledby="viz-tab">
+                        <form action="{{ url_for('data_eda') }}" method="post" class="mt-3">
+                            <div class="mb-3">
+                                <label for="plot_type" class="form-label">Select Plot Type</label>
+                                <select class="form-select" id="plot_type" name="plot_type">
+                                    <option value="histogram">Histogram</option>
+                                    <option value="boxplot">Box Plot</option>
+                                    <option value="scatter">Scatter Plot</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="x_col" class="form-label">X-Axis Column</label>
+                                <select class="form-select" id="x_col" name="x_col">
+                                    {% for col in columns %}
+                                    <option value="{{ col }}">{{ col }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="y_col" class="form-label">Y-Axis Column (Optional)</label>
+                                <select class="form-select" id="y_col" name="y_col">
+                                    <option value="">-- Select Y-Axis Column --</option>
+                                    {% for col in columns %}
+                                    <option value="{{ col }}">{{ col }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-warning w-100">Generate Plot</button>
+                        </form>
+
+                        {% if plot_json %}
+                        <div class="mt-4">
+                            <h5 class="text-center">Generated Plot</h5>
+                            {% if error %}
+                            <div class="alert alert-danger" role="alert">
+                                {{ error }}
+                            </div>
+                            {% else %}
+                            <div id="plot"></div>
+                            <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+                            <script>
+                                var plot_data = {{ plot_json | safe }};
+                                Plotly.react('plot', plot_data.data, plot_data.layout);
+                            </script>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
