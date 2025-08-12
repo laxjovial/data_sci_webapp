@@ -5,6 +5,11 @@ from flask import Flask, render_template, request, redirect, url_for, session
 from utils.data_ingestion import load_data
 import pandas as pd
 import numpy as np
+from utils.data_ingestion import load_data, get_dataframe_summary
+from utils.data_cleaning import handle_missing_values, rename_column, convert_dtype
+
+
+
 
 app = Flask(__name__)
 app.secret_key = 'your_super_secret_key_here' # For session management
@@ -108,5 +113,79 @@ def _get_df_from_session():
             return None, f"Error restoring DataFrame from session: {e}"
     return None, "No dataset loaded. Please go back to the home page to upload one."
 
+
+@app.route('/data_cleaning')
+def data_cleaning():
+    """
+    Renders the data cleaning page.
+
+    Technical: Retrieves the current DataFrame from the session and prepares
+    the data for display in the cleaning interface. It shows a preview of
+    the data along with the available cleaning options.
+
+    Layman: This is the data "car wash" page. It shows you your data and gives
+    you tools to clean it, like fixing missing numbers or changing column names.
+    """
+    df, error_message = _get_df_from_session()
+    if error_message:
+        return render_template('index.html', error=error_message)
+
+    df_head_html, _, _, columns, _ = get_dataframe_summary(df)
+    return render_template('data_cleaning.html',
+                           df_head=df_head_html,
+                           columns=columns)
+
+
+@app.route('/clean_data', methods=['POST'])
+def clean_data():
+    """
+    Processes the data cleaning requests from the form.
+
+    Technical: This route handles various cleaning actions based on the form
+    submission. It calls the appropriate function from `utils/data_cleaning.py`,
+    updates the DataFrame in the session, and redirects the user back to the
+    cleaning page with the new, cleaned data.
+
+    Layman: This is the engine that does the cleaning work. When you choose a
+    cleaning option and click "Apply," this part of the app makes the changes
+    and shows you the result right away.
+    """
+    df, error_message = _get_df_from_session()
+    if error_message:
+        return redirect(url_for('index'))
+
+    action_type = request.form.get('action_type')
+    new_error_message = None
+
+    if action_type == 'handle_missing':
+        columns = request.form.getlist('columns')
+        strategy = request.form.get('strategy')
+        if columns and strategy:
+            df = handle_missing_values(df, columns, strategy)
+    
+    elif action_type == 'rename_column':
+        old_col = request.form.get('old_col')
+        new_col = request.form.get('new_col')
+        if old_col and new_col:
+            df = rename_column(df, old_col, new_col)
+
+    elif action_type == 'convert_type':
+        column = request.form.get('col_to_convert')
+        new_type = request.form.get('new_type')
+        if column and new_type:
+            df, new_error_message = convert_dtype(df, column, new_type)
+
+    session['df'] = df.to_json()
+    
+    # Redirect back to the cleaning page
+    df_head_html, _, _, columns, _ = get_dataframe_summary(df)
+    return render_template('data_cleaning.html',
+                           df_head=df_head_html,
+                           columns=columns,
+                           error=new_error_message)
+
+
 if __name__ == '__main__':
     app.run(debug=True)
+
+
