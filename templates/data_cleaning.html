@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-success text-white">
+                <h4>Data Cleaning & Preprocessing</h4>
+                <p class="mb-0">
+                    <span class="fw-bold">Technical:</span> This module provides robust tools for handling
+                    common data quality issues. It includes methods for managing missing values, standardizing
+                    formats, and dealing with inconsistencies, ensuring data integrity for subsequent analysis.
+                    <br>
+                    <span class="fw-bold">Layman:</span> Think of this as your app's "car wash" for data. Here,
+                    we'll fix all the messy parts of your dataset, like missing information or typos, so it's
+                    sparkling clean and ready for analysis.
+                </p>
+            </div>
+            <div class="card-body">
+                {% if error %}
+                <div class="alert alert-danger" role="alert">
+                    {{ error }}
+                </div>
+                {% endif %}
+                <ul class="nav nav-pills mb-3" id="pills-tab" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="pills-missing-tab" data-bs-toggle="pill" data-bs-target="#pills-missing" type="button" role="tab" aria-controls="pills-missing" aria-selected="true">Missing Values</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="pills-columns-tab" data-bs-toggle="pill" data-bs-target="#pills-columns" type="button" role="tab" aria-controls="pills-columns" aria-selected="false">Columns & Types</button>
+                    </li>
+                </ul>
+                <div class="tab-content" id="pills-tabContent">
+                    <div class="tab-pane fade show active" id="pills-missing" role="tabpanel" aria-labelledby="pills-missing-tab">
+                        <form action="{{ url_for('clean_data') }}" method="post">
+                            <input type="hidden" name="action_type" value="handle_missing">
+                            <div class="mb-3">
+                                <label for="missing_cols" class="form-label">Select Columns to Handle Missing Values</label>
+                                <select class="form-select" id="missing_cols" name="columns" multiple>
+                                    {% for col in columns %}
+                                    <option value="{{ col }}">{{ col }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="imputation_strategy" class="form-label">Strategy</label>
+                                <select class="form-select" id="imputation_strategy" name="strategy">
+                                    <option value="mean">Impute with Mean (Numeric)</option>
+                                    <option value="median">Impute with Median (Numeric)</option>
+                                    <option value="mode">Impute with Mode (Numeric & Categorical)</option>
+                                    <option value="drop">Remove Rows with Missing Values</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-success">Apply</button>
+                        </form>
+                    </div>
+
+                    <div class="tab-pane fade" id="pills-columns" role="tabpanel" aria-labelledby="pills-columns-tab">
+                        <form action="{{ url_for('clean_data') }}" method="post">
+                            <input type="hidden" name="action_type" value="rename_column">
+                            <div class="mb-3">
+                                <label for="old_col" class="form-label">Rename a Column</label>
+                                <div class="row">
+                                    <div class="col">
+                                        <select class="form-select" id="old_col" name="old_col">
+                                            <option value="">Select Column</option>
+                                            {% for col in columns %}
+                                            <option value="{{ col }}">{{ col }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col">
+                                        <input type="text" class="form-control" name="new_col" placeholder="New Column Name">
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-success">Rename</button>
+                        </form>
+                        <hr>
+                        <form action="{{ url_for('clean_data') }}" method="post">
+                            <input type="hidden" name="action_type" value="convert_type">
+                            <div class="mb-3">
+                                <label for="col_to_convert" class="form-label">Convert Column Data Type</label>
+                                <div class="row">
+                                    <div class="col">
+                                        <select class="form-select" id="col_to_convert" name="col_to_convert">
+                                            <option value="">Select Column</option>
+                                            {% for col in columns %}
+                                            <option value="{{ col }}">{{ col }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col">
+                                        <select class="form-select" name="new_type">
+                                            <option value="int">Integer</option>
+                                            <option value="float">Float</option>
+                                            <option value="str">String</option>
+                                            <option value="datetime">Datetime</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-success">Convert</button>
+                        </form>
+                    </div>
+                </div>
+                <hr>
+                <h5>Current Dataset Preview</h5>
+                {{ df_head | safe }}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
