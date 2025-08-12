@@ -7,8 +7,8 @@ from utils.data_cleaning import (
     remove_duplicates, standardize_text, handle_outliers, correct_inconsistencies
 )
 from utils.data_visualization import generate_plot
-from utils.data_engineering import create_new_feature, one_hot_encode_column
-from utils.data_export import export_dataframe, export_ipynb # New Import!
+from utils.data_engineering import create_new_feature, one_hot_encode_column # New Import!
+from utils.data_export import export_dataframe, export_ipynb
 import pandas as pd
 import numpy as np
 import io
@@ -18,6 +18,7 @@ app = Flask(__name__)
 app.secret_key = 'your_super_secret_key_here' 
 
 # Define the stages of our data science pipeline
+# Updated with Feature Engineering!
 PIPELINE_STAGES = [
     "Data Ingestion",
     "Data Cleaning",
@@ -107,7 +108,6 @@ def index():
     """
     The main route for the web application, now with file upload functionality.
     """
-    # ... (rest of the function is the same) ...
     if request.method == 'POST':
         source_type = request.form.get('source_type')
         
@@ -138,7 +138,6 @@ def index():
 
 @app.route('/data_viewer')
 def data_viewer():
-    # ... (rest of the function is the same) ...
     df, error_message = _get_df_from_session()
     if error_message:
         current_stage, progress_percent = _get_progress_data("Data Ingestion")
@@ -153,14 +152,13 @@ def data_viewer():
                            df_info=info_str,
                            df_desc=desc_html,
                            columns=columns,
-                           unique_values=unique_values,
+                           unique_values=unique_values, # Added this to support your EDA request
                            current_stage=current_stage,
                            progress_percent=progress_percent)
 
 
 @app.route('/data_cleaning')
 def data_cleaning():
-    # ... (rest of the function is the same) ...
     df, error_message = _get_df_from_session()
     if error_message:
         current_stage, progress_percent = _get_progress_data("Data Ingestion")
@@ -179,7 +177,6 @@ def data_cleaning():
 
 @app.route('/clean_data', methods=['POST'])
 def clean_data():
-    # ... (rest of the function is the same) ...
     df, error_message = _get_df_from_session()
     if error_message:
         return redirect(url_for('index'))
@@ -235,7 +232,6 @@ def clean_data():
 
 @app.route('/data_eda', methods=['GET', 'POST'])
 def data_eda():
-    # ... (rest of the function is the same) ...
     df, error_message = _get_df_from_session()
     if error_message:
         return redirect(url_for('index'))
@@ -257,16 +253,18 @@ def data_eda():
                            df_info=info_str,
                            df_desc=desc_html,
                            columns=columns,
-                           unique_values=unique_values, # Added this to support your EDA request
+                           unique_values=unique_values,
                            plot_json=plot_json,
                            error=error_message,
                            current_stage=current_stage,
                            progress_percent=progress_percent)
 
-
+# --- NEW ROUTE FOR FEATURE ENGINEERING ---
 @app.route('/feature_engineering')
 def feature_engineering():
-    # ... (rest of the function is the same) ...
+    """
+    Renders the Feature Engineering page.
+    """
     df, error_message = _get_df_from_session()
     if error_message:
         return redirect(url_for('index'))
@@ -281,10 +279,11 @@ def feature_engineering():
                            current_stage=current_stage,
                            progress_percent=progress_percent)
 
-
 @app.route('/engineer_features', methods=['POST'])
 def engineer_features():
-    # ... (rest of the function is the same) ...
+    """
+    Handles the form submissions for feature engineering actions.
+    """
     df, error_message = _get_df_from_session()
     if error_message:
         return redirect(url_for('index'))
@@ -316,6 +315,7 @@ def engineer_features():
                            error=new_error_message,
                            current_stage=current_stage,
                            progress_percent=progress_percent)
+
 
 if __name__ == '__main__':
     app.run(debug=True)
