@@ -35,11 +35,11 @@
                 </ul>
                 <div class="tab-content" id="myTabContent">
                     <div class="tab-pane fade show active" id="head" role="tabpanel" aria-labelledby="head-tab">
-                        <h5 class="mt-3">First 5 Rows of the Dataset</h5>
+                        <h5 class="mt-3">First 5 Rows (`.head()`)</h5>
                         {{ df_head | safe }}
                     </div>
                     <div class="tab-pane fade" id="info" role="tabpanel" aria-labelledby="info-tab">
-                        <h5 class="mt-3">Dataset Information (`.info()`)</h5>
+                        <h5 class="mt-3">Dataset Info (`.info()`)</h5>
                         <pre>{{ df_info }}</pre>
                     </div>
                     <div class="tab-pane fade" id="desc" role="tabpanel" aria-labelledby="desc-tab">
