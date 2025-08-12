@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h4>Dataset Overview</h4>
+                <p class="mb-0">
+                    <span class="fw-bold">Technical:</span>
+                    This page provides a comprehensive overview of the loaded DataFrame. It displays key information
+                    like data types and non-null counts, descriptive statistics, and a sample of the data. 
+                    This is crucial for the initial Exploratory Data Analysis (EDA) phase.
+                    <br>
+                    <span class="fw-bold">Layman:</span>
+                    Your data is loaded! This page is like a quick check-up for your data. You can see how many 
+                    rows and columns it has, what kind of information is in each column (like numbers or text), 
+                    and get a general summary to make sure everything looks right before we start cleaning.
+                </p>
+            </div>
+            <div class="card-body">
+                <ul class="nav nav-tabs" id="myTab" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="head-tab" data-bs-toggle="tab" data-bs-target="#head" type="button" role="tab" aria-controls="head" aria-selected="true">First 5 Rows</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="info-tab" data-bs-toggle="tab" data-bs-target="#info" type="button" role="tab" aria-controls="info" aria-selected="false">Dataset Info</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="desc-tab" data-bs-toggle="tab" data-bs-target="#desc" type="button" role="tab" aria-controls="desc" aria-selected="false">Descriptive Stats</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="unique-tab" data-bs-toggle="tab" data-bs-target="#unique" type="button" role="tab" aria-controls="unique" aria-selected="false">Unique Values</button>
+                    </li>
+                </ul>
+                <div class="tab-content" id="myTabContent">
+                    <div class="tab-pane fade show active" id="head" role="tabpanel" aria-labelledby="head-tab">
+                        <h5 class="mt-3">First 5 Rows of the Dataset</h5>
+                        {{ df_head | safe }}
+                    </div>
+                    <div class="tab-pane fade" id="info" role="tabpanel" aria-labelledby="info-tab">
+                        <h5 class="mt-3">Dataset Information (`.info()`)</h5>
+                        <pre>{{ df_info }}</pre>
+                    </div>
+                    <div class="tab-pane fade" id="desc" role="tabpanel" aria-labelledby="desc-tab">
+                        <h5 class="mt-3">Descriptive Statistics (`.describe()`)</h5>
+                        {{ df_desc | safe }}
+                    </div>
+                    <div class="tab-pane fade" id="unique" role="tabpanel" aria-labelledby="unique-tab">
+                        <h5 class="mt-3">Unique Values (Top 10) per Column</h5>
+                        <table class="table table-striped table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Column</th>
+                                    <th>Unique Values</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for col, values in unique_values.items() %}
+                                <tr>
+                                    <td>{{ col }}</td>
+                                    <td>{{ values|join(', ') }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
