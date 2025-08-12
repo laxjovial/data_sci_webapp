@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-secondary text-white">
+                <h4>Phase 4: Feature Engineering</h4>
+                <p class="mb-0">
+                    <span class="fw-bold">Technical:</span> This module provides advanced tools for feature
+                    engineering, including creating new features from existing ones, encoding categorical
+                    variables, and scaling numerical features. These steps are crucial for preparing data
+                    for machine learning models.
+                    <br>
+                    <span class="fw-bold">Layman:</span> Think of this as getting your data into the best shape
+                    possible for the computer to understand it. We can create new, more useful data columns,
+                    turn text into numbers, and make sure all numbers are on the same scale, so our model can
+                    learn effectively.
+                </p>
+            </div>
+            <div class="card-body">
+                {% if error %}
+                <div class="alert alert-danger" role="alert">
+                    {{ error }}
+                </div>
+                {% endif %}
+                {% if success %}
+                <div class="alert alert-success" role="alert">
+                    {{ success }}
+                </div>
+                {% endif %}
+
+                <ul class="nav nav-pills mb-3" id="pills-tab" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="pills-create-tab" data-bs-toggle="pill" data-bs-target="#pills-create" type="button" role="tab" aria-controls="pills-create" aria-selected="true">Create Feature</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="pills-encode-tab" data-bs-toggle="pill" data-bs-target="#pills-encode" type="button" role="tab" aria-controls="pills-encode" aria-selected="false">Encode Columns</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="pills-scale-tab" data-bs-toggle="pill" data-bs-target="#pills-scale" type="button" role="tab" aria-controls="pills-scale" aria-selected="false">Scale Features</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="pills-rename-drop-tab" data-bs-toggle="pill" data-bs-target="#pills-rename-drop" type="button" role="tab" aria-controls="pills-rename-drop" aria-selected="false">Rename/Drop</button>
+                    </li>
+                </ul>
+                <div class="tab-content" id="pills-tabContent">
+                    <!-- Create New Feature -->
+                    <div class="tab-pane fade show active" id="pills-create" role="tabpanel" aria-labelledby="pills-create-tab">
+                        <form action="{{ url_for('data_engineering') }}" method="post" class="mt-3">
+                            <input type="hidden" name="action" value="create_feature">
+                            <div class="mb-3">
+                                <label for="col1" class="form-label">Select First Column</label>
+                                <select class="form-select" id="col1" name="col1" required>
+                                    <option value="">-- Select Column --</option>
+                                    {% for col in columns %}
+                                    <option value="{{ col }}">{{ col }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="operation" class="form-label">Select Operation</label>
+                                <select class="form-select" id="operation" name="operation" required>
+                                    <option value="">-- Select Operation --</option>
+                                    <option value="add">Addition (+)</option>
+                                    <option value="subtract">Subtraction (-)</option>
+                                    <option value="multiply">Multiplication (*)</option>
+                                    <option value="divide">Division (/)</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="col2" class="form-label">Select Second Column</label>
+                                <select class="form-select" id="col2" name="col2" required>
+                                    <option value="">-- Select Column --</option>
+                                    {% for col in columns %}
+                                    <option value="{{ col }}">{{ col }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="new_col_name" class="form-label">New Column Name</label>
+                                <input type="text" class="form-control" id="new_col_name" name="new_col_name" required>
+                            </div>
+                            <button type="submit" class="btn btn-secondary">Create Feature</button>
+                        </form>
+                    </div>
+
+                    <!-- Apply Encoding -->
+                    <div class="tab-pane fade" id="pills-encode" role="tabpanel" aria-labelledby="pills-encode-tab">
+                        <form action="{{ url_for('data_engineering') }}" method="post" class="mt-3">
+                            <input type="hidden" name="action" value="apply_encoding">
+                            <div class="mb-3">
+                                <label for="encode_columns" class="form-label">Select Columns to Encode</label>
+                                <select class="form-select" id="encode_columns" name="columns" multiple size="5" required>
+                                    {% for col in columns %}
+                                    <option value="{{ col }}">{{ col }}</option>
+                                    {% endfor %}
+                                </select>
+                                <div class="form-text">Hold down Ctrl (Windows) / Command (Mac) to select multiple columns.</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="encoding_type" class="form-label">Select Encoding Type</label>
+                                <select class="form-select" id="encoding_type" name="encoding_type" required>
+                                    <option value="">-- Select Type --</option>
+                                    <option value="one_hot">One-Hot Encoding</option>
+                                    <option value="label">Label Encoding</option>
+                                    <option value="ordinal">Ordinal Encoding</option>
+                                    <option value="frequency">Frequency Encoding</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-secondary">Apply Encoding</button>
+                        </form>
+                    </div>
+
+                    <!-- Scale Features -->
+                    <div class="tab-pane fade" id="pills-scale" role="tabpanel" aria-labelledby="pills-scale-tab">
+                        <form action="{{ url_for('data_engineering') }}" method="post" class="mt-3">
+                            <input type="hidden" name="action" value="scale_features">
+                            <div class="mb-3">
+                                <label for="scale_columns" class="form-label">Select Numeric Columns to Scale</label>
+                                <select class="form-select" id="scale_columns" name="columns" multiple size="5" required>
+                                    {% for col in columns %}
+                                    <option value="{{ col }}">{{ col }}</option>
+                                    {% endfor %}
+                                </select>
+                                <div class="form-text">Hold down Ctrl (Windows) / Command (Mac) to select multiple columns.</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="scaler_type" class="form-label">Select Scaler Type</label>
+                                <select class="form-select" id="scaler_type" name="scaler_type" required>
+                                    <option value="">-- Select Scaler --</option>
+                                    <option value="standard">StandardScaler</option>
+                                    <option value="minmax">MinMaxScaler</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-secondary">Apply Scaling</button>
+                        </form>
+                    </div>
+
+                    <!-- Rename/Drop Columns -->
+                    <div class="tab-pane fade" id="pills-rename-drop" role="tabpanel" aria-labelledby="pills-rename-drop-tab">
+                        <form action="{{ url_for('data_engineering') }}" method="post" class="mt-3">
+                            <input type="hidden" name="action" value="rename_drop">
+                            <div class="mb-3">
+                                <label for="old_col_name" class="form-label">Old Column Name to Rename (optional)</label>
+                                <select class="form-select" id="old_col_name" name="old_column_name">
+                                    <option value="">-- Select Column --</option>
+                                    {% for col in columns %}
+                                    <option value="{{ col }}">{{ col }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="new_col_name" class="form-label">New Column Name</label>
+                                <input type="text" class="form-control" id="new_col_name" name="new_column_name">
+                            </div>
+                            <hr>
+                            <div class="mb-3">
+                                <label for="drop_columns" class="form-label">Select Columns to Drop (optional)</label>
+                                <select class="form-select" id="drop_columns" name="columns_to_drop" multiple size="5">
+                                    {% for col in columns %}
+                                    <option value="{{ col }}">{{ col }}</option>
+                                    {% endfor %}
+                                </select>
+                                <div class="form-text">Hold down Ctrl (Windows) / Command (Mac) to select multiple columns.</div>
+                            </div>
+                            <button type="submit" class="btn btn-secondary">Apply Changes</button>
+                        </form>
+                    </div>
+                </div>
+
+                <hr>
+                <h5>Current Dataset Preview</h5>
+                {{ df_head | safe }}
+            </div>
+        </div>
+    </div>
+</div>
+<hr>
+<a href="{{ url_for('model_building') }}" class="btn btn-info">Proceed to Model Building</a>
+{% endblock %}
