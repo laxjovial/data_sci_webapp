@@ -1,5 +1,7 @@
 Flask
 pandas
-plotly
+numpy
 scikit-learn
+plotly
 requests
+openpyxl
