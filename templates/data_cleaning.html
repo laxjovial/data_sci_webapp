@@ -27,123 +27,132 @@
                         <button class="nav-link active" id="pills-missing-tab" data-bs-toggle="pill" data-bs-target="#pills-missing" type="button" role="tab" aria-controls="pills-missing" aria-selected="true">Missing Values</button>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="pills-columns-tab" data-bs-toggle="pill" data-bs-target="#pills-columns" type="button" role="tab" aria-controls="pills-columns" aria-selected="false">Columns & Types</button>
+                        <button class="nav-link" id="pills-rename-tab" data-bs-toggle="pill" data-bs-target="#pills-rename" type="button" role="tab" aria-controls="pills-rename" aria-selected="false">Rename Column</button>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="pills-duplicates-tab" data-bs-toggle="pill" data-bs-target="#pills-duplicates" type="button" role="tab" aria-controls="pills-duplicates" aria-selected="false">Duplicates</button>
+                        <button class="nav-link" id="pills-dtype-tab" data-bs-toggle="pill" data-bs-target="#pills-dtype" type="button" role="tab" aria-controls="pills-dtype" aria-selected="false">Convert Data Type</button>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="pills-text-tab" data-bs-toggle="pill" data-bs-target="#pills-text" type="button" role="tab" aria-controls="pills-text" aria-selected="false">Text Standardization</button>
+                        <button class="nav-link" id="pills-duplicates-tab" data-bs-toggle="pill" data-bs-target="#pills-duplicates" type="button" role="tab" aria-controls="pills-duplicates" aria-selected="false">Remove Duplicates</button>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="pills-outliers-tab" data-bs-toggle="pill" data-bs-target="#pills-outliers" type="button" role="tab" aria-controls="pills-outliers" aria-selected="false">Outliers</button>
+                        <button class="nav-link" id="pills-text-tab" data-bs-toggle="pill" data-bs-target="#pills-text" type="button" role="tab" aria-controls="pills-text" aria-selected="false">Standardize Text</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="pills-outliers-tab" data-bs-toggle="pill" data-bs-target="#pills-outliers" type="button" role="tab" aria-controls="pills-outliers" aria-selected="false">Handle Outliers</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="pills-inconsistencies-tab" data-bs-toggle="pill" data-bs-target="#pills-inconsistencies" type="button" role="tab" aria-controls="pills-inconsistencies" aria-selected="false">Correct Inconsistencies</button>
                     </li>
                 </ul>
                 <div class="tab-content" id="pills-tabContent">
+                    <!-- Missing Values Tab -->
                     <div class="tab-pane fade show active" id="pills-missing" role="tabpanel" aria-labelledby="pills-missing-tab">
-                        <form action="{{ url_for('clean_data') }}" method="post">
-                            <input type="hidden" name="action_type" value="handle_missing">
+                        <form action="{{ url_for('data_cleaning') }}" method="post" class="mt-3">
+                            <input type="hidden" name="action" value="missing_values">
                             <div class="mb-3">
-                                <label for="missing_cols" class="form-label">Select Columns to Handle Missing Values</label>
-                                <select class="form-select" id="missing_cols" name="columns" multiple>
+                                <label for="columns" class="form-label">Select Columns</label>
+                                <select class="form-select" id="columns" name="columns" multiple size="5">
                                     {% for col in columns %}
                                     <option value="{{ col }}">{{ col }}</option>
                                     {% endfor %}
                                 </select>
                             </div>
                             <div class="mb-3">
-                                <label for="imputation_strategy" class="form-label">Strategy</label>
-                                <select class="form-select" id="imputation_strategy" name="strategy">
-                                    <option value="mean">Impute with Mean (Numeric)</option>
-                                    <option value="median">Impute with Median (Numeric)</option>
-                                    <option value="mode">Impute with Mode (Numeric & Categorical)</option>
-                                    <option value="drop">Remove Rows with Missing Values</option>
+                                <label for="strategy" class="form-label">Strategy</label>
+                                <select class="form-select" id="strategy" name="strategy">
+                                    <option value="drop">Drop Rows with Missing Values</option>
+                                    <option value="mean">Fill with Mean (Numeric Only)</option>
+                                    <option value="median">Fill with Median (Numeric Only)</option>
+                                    <option value="mode">Fill with Mode</option>
                                 </select>
                             </div>
                             <button type="submit" class="btn btn-success">Apply</button>
                         </form>
                     </div>
-
-                    <div class="tab-pane fade" id="pills-columns" role="tabpanel" aria-labelledby="pills-columns-tab">
-                        <form action="{{ url_for('clean_data') }}" method="post">
-                            <input type="hidden" name="action_type" value="rename_column">
+                    <!-- Rename Column Tab -->
+                    <div class="tab-pane fade" id="pills-rename" role="tabpanel" aria-labelledby="pills-rename-tab">
+                        <form action="{{ url_for('data_cleaning') }}" method="post" class="mt-3">
+                            <input type="hidden" name="action" value="rename_column">
                             <div class="mb-3">
-                                <label for="old_col" class="form-label">Rename a Column</label>
-                                <div class="row">
-                                    <div class="col">
-                                        <select class="form-select" id="old_col" name="old_col">
-                                            <option value="">Select Column</option>
-                                            {% for col in columns %}
-                                            <option value="{{ col }}">{{ col }}</option>
-                                            {% endfor %}
-                                        </select>
-                                    </div>
-                                    <div class="col">
-                                        <input type="text" class="form-control" name="new_col" placeholder="New Column Name">
-                                    </div>
-                                </div>
-                            </div>
-                            <button type="submit" class="btn btn-success">Rename</button>
-                        </form>
-                        <hr>
-                        <form action="{{ url_for('clean_data') }}" method="post">
-                            <input type="hidden" name="action_type" value="convert_type">
-                            <div class="mb-3">
-                                <label for="col_to_convert" class="form-label">Convert Column Data Type</label>
-                                <div class="row">
-                                    <div class="col">
-                                        <select class="form-select" id="col_to_convert" name="col_to_convert">
-                                            <option value="">Select Column</option>
-                                            {% for col in columns %}
-                                            <option value="{{ col }}">{{ col }}</option>
-                                            {% endfor %}
-                                        </select>
-                                    </div>
-                                    <div class="col">
-                                        <select class="form-select" name="new_type">
-                                            <option value="int">Integer</option>
-                                            <option value="float">Float</option>
-                                            <option value="str">String</option>
-                                            <option value="datetime">Datetime</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-                            <button type="submit" class="btn btn-success">Convert</button>
-                        </form>
-                    </div>
-
-                    <div class="tab-pane fade" id="pills-duplicates" role="tabpanel" aria-labelledby="pills-duplicates-tab">
-                        <form action="{{ url_for('clean_data') }}" method="post">
-                            <input type="hidden" name="action_type" value="remove_duplicates">
-                            <p>Click the button below to remove all duplicate rows from the dataset.</p>
-                            <button type="submit" class="btn btn-success">Remove Duplicates</button>
-                        </form>
-                    </div>
-
-                    <div class="tab-pane fade" id="pills-text" role="tabpanel" aria-labelledby="pills-text-tab">
-                        <form action="{{ url_for('clean_data') }}" method="post">
-                            <input type="hidden" name="action_type" value="standardize_text">
-                            <div class="mb-3">
-                                <label for="standardize_cols" class="form-label">Select Columns for Text Standardization</label>
-                                <select class="form-select" id="standardize_cols" name="standardize_cols" multiple>
+                                <label for="old_col" class="form-label">Old Column Name</label>
+                                <select class="form-select" id="old_col" name="old_col">
                                     {% for col in columns %}
                                     <option value="{{ col }}">{{ col }}</option>
                                     {% endfor %}
                                 </select>
                             </div>
-                            <button type="submit" class="btn btn-success">Standardize Text</button>
+                            <div class="mb-3">
+                                <label for="new_col" class="form-label">New Column Name</label>
+                                <input type="text" class="form-control" id="new_col" name="new_col" required>
+                            </div>
+                            <button type="submit" class="btn btn-success">Apply</button>
                         </form>
                     </div>
-
+                    <!-- Convert Data Type Tab -->
+                    <div class="tab-pane fade" id="pills-dtype" role="tabpanel" aria-labelledby="pills-dtype-tab">
+                        <form action="{{ url_for('data_cleaning') }}" method="post" class="mt-3">
+                            <input type="hidden" name="action" value="convert_dtype">
+                            <div class="mb-3">
+                                <label for="dtype_col" class="form-label">Select Column</label>
+                                <select class="form-select" id="dtype_col" name="dtype_col">
+                                    {% for col in columns %}
+                                    <option value="{{ col }}">{{ col }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="new_dtype" class="form-label">New Data Type</label>
+                                <select class="form-select" id="new_dtype" name="new_dtype">
+                                    <option value="int64">Integer</option>
+                                    <option value="float64">Float</option>
+                                    <option value="object">Object (String)</option>
+                                    <option value="datetime">Datetime</option>
+                                    <option value="category">Category</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-success">Apply</button>
+                        </form>
+                    </div>
+                    <!-- Remove Duplicates Tab -->
+                    <div class="tab-pane fade" id="pills-duplicates" role="tabpanel" aria-labelledby="pills-duplicates-tab">
+                        <form action="{{ url_for('data_cleaning') }}" method="post" class="mt-3">
+                            <input type="hidden" name="action" value="remove_duplicates">
+                            <div class="mb-3">
+                                <label for="duplicates_columns" class="form-label">Select Columns to Check for Duplicates</label>
+                                <select class="form-select" id="duplicates_columns" name="columns" multiple size="5">
+                                    {% for col in columns %}
+                                    <option value="{{ col }}">{{ col }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-success">Apply</button>
+                        </form>
+                    </div>
+                    <!-- Standardize Text Tab -->
+                    <div class="tab-pane fade" id="pills-text" role="tabpanel" aria-labelledby="pills-text-tab">
+                         <form action="{{ url_for('data_cleaning') }}" method="post" class="mt-3">
+                            <input type="hidden" name="action" value="standardize_text">
+                            <div class="mb-3">
+                                <label for="standardize_col" class="form-label">Select Text Column</label>
+                                <select class="form-select" id="standardize_col" name="standardize_col">
+                                    {% for col in columns %}
+                                    <option value="{{ col }}">{{ col }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-success">Apply</button>
+                        </form>
+                    </div>
+                    <!-- Handle Outliers Tab -->
                     <div class="tab-pane fade" id="pills-outliers" role="tabpanel" aria-labelledby="pills-outliers-tab">
-                        <form action="{{ url_for('clean_data') }}" method="post">
-                            <input type="hidden" name="action_type" value="handle_outliers">
+                        <form action="{{ url_for('data_cleaning') }}" method="post" class="mt-3">
+                            <input type="hidden" name="action" value="handle_outliers">
                             <div class="mb-3">
                                 <label for="outlier_col" class="form-label">Select Numeric Column to Handle Outliers</label>
                                 <select class="form-select" id="outlier_col" name="outlier_col">
                                     <option value="">Select Column</option>
-                                    {% for col in columns %}
+                                    {% for col in columns %}.
                                     <option value="{{ col }}">{{ col }}</option>
                                     {% endfor %}
                                 </select>
@@ -154,6 +163,25 @@
                                     <option value="remove">Remove Outlier Rows (IQR Method)</option>
                                     <option value="cap">Cap Outliers (IQR Method)</option>
                                 </select>
+                            </div>
+                            <button type="submit" class="btn btn-success">Apply</button>
+                        </form>
+                    </div>
+                    <!-- Correct Inconsistencies Tab -->
+                    <div class="tab-pane fade" id="pills-inconsistencies" role="tabpanel" aria-labelledby="pills-inconsistencies-tab">
+                        <form action="{{ url_for('data_cleaning') }}" method="post" class="mt-3">
+                            <input type="hidden" name="action" value="correct_inconsistencies">
+                            <div class="mb-3">
+                                <label for="inconsist_col" class="form-label">Select Column</label>
+                                <select class="form-select" id="inconsist_col" name="inconsist_col">
+                                    {% for col in columns %}
+                                    <option value="{{ col }}">{{ col }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="mapping_dict" class="form-label">Mapping Dictionary (e.g., {'Old Value': 'New Value'})</label>
+                                <input type="text" class="form-control" id="mapping_dict" name="mapping_dict" required>
                             </div>
                             <button type="submit" class="btn btn-success">Apply</button>
                         </form>
