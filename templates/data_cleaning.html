@@ -29,6 +29,15 @@
                     <li class="nav-item" role="presentation">
                         <button class="nav-link" id="pills-columns-tab" data-bs-toggle="pill" data-bs-target="#pills-columns" type="button" role="tab" aria-controls="pills-columns" aria-selected="false">Columns & Types</button>
                     </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="pills-duplicates-tab" data-bs-toggle="pill" data-bs-target="#pills-duplicates" type="button" role="tab" aria-controls="pills-duplicates" aria-selected="false">Duplicates</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="pills-text-tab" data-bs-toggle="pill" data-bs-target="#pills-text" type="button" role="tab" aria-controls="pills-text" aria-selected="false">Text Standardization</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="pills-outliers-tab" data-bs-toggle="pill" data-bs-target="#pills-outliers" type="button" role="tab" aria-controls="pills-outliers" aria-selected="false">Outliers</button>
+                    </li>
                 </ul>
                 <div class="tab-content" id="pills-tabContent">
                     <div class="tab-pane fade show active" id="pills-missing" role="tabpanel" aria-labelledby="pills-missing-tab">
@@ -101,6 +110,52 @@
                                 </div>
                             </div>
                             <button type="submit" class="btn btn-success">Convert</button>
+                        </form>
+                    </div>
+
+                    <div class="tab-pane fade" id="pills-duplicates" role="tabpanel" aria-labelledby="pills-duplicates-tab">
+                        <form action="{{ url_for('clean_data') }}" method="post">
+                            <input type="hidden" name="action_type" value="remove_duplicates">
+                            <p>Click the button below to remove all duplicate rows from the dataset.</p>
+                            <button type="submit" class="btn btn-success">Remove Duplicates</button>
+                        </form>
+                    </div>
+
+                    <div class="tab-pane fade" id="pills-text" role="tabpanel" aria-labelledby="pills-text-tab">
+                        <form action="{{ url_for('clean_data') }}" method="post">
+                            <input type="hidden" name="action_type" value="standardize_text">
+                            <div class="mb-3">
+                                <label for="standardize_cols" class="form-label">Select Columns for Text Standardization</label>
+                                <select class="form-select" id="standardize_cols" name="standardize_cols" multiple>
+                                    {% for col in columns %}
+                                    <option value="{{ col }}">{{ col }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-success">Standardize Text</button>
+                        </form>
+                    </div>
+
+                    <div class="tab-pane fade" id="pills-outliers" role="tabpanel" aria-labelledby="pills-outliers-tab">
+                        <form action="{{ url_for('clean_data') }}" method="post">
+                            <input type="hidden" name="action_type" value="handle_outliers">
+                            <div class="mb-3">
+                                <label for="outlier_col" class="form-label">Select Numeric Column to Handle Outliers</label>
+                                <select class="form-select" id="outlier_col" name="outlier_col">
+                                    <option value="">Select Column</option>
+                                    {% for col in columns %}
+                                    <option value="{{ col }}">{{ col }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="outlier_method" class="form-label">Method</label>
+                                <select class="form-select" id="outlier_method" name="outlier_method">
+                                    <option value="remove">Remove Outlier Rows (IQR Method)</option>
+                                    <option value="cap">Cap Outliers (IQR Method)</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-success">Apply</button>
                         </form>
                     </div>
                 </div>
