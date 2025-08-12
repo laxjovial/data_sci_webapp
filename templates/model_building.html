@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-danger text-white">
+                <h4>Phase 5: Model Building</h4>
+                <p class="mb-0">
+                    <span class="fw-bold">Technical:</span> This module will provide an interface for training and evaluating machine learning models. It will allow you to select a target variable, split your data, and test different algorithms.
+                    <br>
+                    <span class="fw-bold">Layman:</span> We're ready to build a predictive model! We'll use the prepared data to train a computer program that can make predictions.
+                </p>
+            </div>
+            <div class="card-body">
+                <h5>Current Dataset Preview</h5>
+                {{ df_head | safe }}
+                <hr>
+                <div class="alert alert-info" role="alert">
+                    This page is currently a placeholder. The next step would be to build out the functionality for training different models using the code you provided!
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<hr>
+<a href="#" class="btn btn-success disabled">Proceed to Model Evaluation</a>
+{% endblock %}
