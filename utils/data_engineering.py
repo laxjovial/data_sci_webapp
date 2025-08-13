@@ -42,101 +42,86 @@ def create_new_feature(df, col1, col2, operation, new_col_name):
         elif operation == 'multiply':
             df_engineered[new_col_name] = df_engineered[col1] * df_engineered[col2]
         elif operation == 'divide':
-            # Handle division by zero
             if (df_engineered[col2] == 0).any():
                 return None, "Error: Division by zero is not allowed."
             df_engineered[new_col_name] = df_engineered[col1] / df_engineered[col2]
         else:
             return None, "Error: Invalid operation specified. Use 'add', 'subtract', 'multiply', or 'divide'."
-        
         return df_engineered, None
     except Exception as e:
-        return None, f"An error occurred during feature creation: {e}"
+        return None, f"An unexpected error occurred: {e}"
 
-def apply_encoding(df, columns, encoding_type, **kwargs):
+def apply_encoding(df, column, encoding_type):
     """
-    Applies various encoding techniques to specified categorical columns.
+    Applies encoding to a categorical column.
 
-    Technical: This function provides a unified interface for several encoding
-    methods. Label Encoding is for binary data. Ordinal Encoding is for
-    ordered categorical data. One-Hot Encoding creates new binary columns
-    for each category. Frequency Encoding replaces categories with their
-    frequency in the dataset.
+    Technical: This function uses popular scikit-learn encoders.
+    One-Hot Encoding creates new binary columns for each category.
+    Label Encoding converts each category into a unique integer.
 
-    Layman: This is where we turn text-based categories (like 'car' or 'radio/TV')
-    into numbers that a computer can understand. We have different ways to do this,
-    depending on whether the categories have a natural order or not.
+    Layman: This turns text categories, like 'Red', 'Green', 'Blue', into
+    numbers that a machine learning model can understand. This is a crucial
+    step for preparing categorical data.
 
     Args:
         df (pd.DataFrame): The input DataFrame.
-        columns (list): A list of column names to encode.
-        encoding_type (str): The type of encoding to apply ('one_hot', 'label', 'ordinal', 'frequency').
-        **kwargs: Additional arguments for specific encoders (e.g., categories for OrdinalEncoder).
+        column (str): The column to encode.
+        encoding_type (str): The type of encoding to apply ('one-hot', 'label', 'ordinal').
 
     Returns:
-        tuple: The DataFrame with encoded columns and an error message (if any).
+        tuple: A tuple containing the new DataFrame and an error message (if any).
     """
     df_encoded = df.copy()
-    error_message = None
+    if column not in df_encoded.columns:
+        return None, f"Error: Column '{column}' not found."
+    
     try:
-        for col in columns:
-            if not pd.api.types.is_categorical_dtype(df_encoded[col]) and not pd.api.types.is_object_dtype(df_encoded[col]):
-                continue
-
-            if encoding_type == 'label':
-                le = LabelEncoder()
-                df_encoded[col] = le.fit_transform(df_encoded[col])
-            elif encoding_type == 'ordinal':
-                oe = OrdinalEncoder(**kwargs)
-                df_encoded[col] = oe.fit_transform(df_encoded[[col]])
-            elif encoding_type == 'one_hot':
-                ohe = OneHotEncoder(handle_unknown='ignore', sparse_output=False)
-                encoded_cols = ohe.fit_transform(df_encoded[[col]])
-                encoded_df = pd.DataFrame(encoded_cols, columns=ohe.get_feature_names_out([col]), index=df_encoded.index)
-                df_encoded = pd.concat([df_encoded.drop(col, axis=1), encoded_df], axis=1)
-            elif encoding_type == 'frequency':
-                freq_map = df_encoded[col].value_counts(normalize=True)
-                df_encoded[col] = df_encoded[col].map(freq_map)
-            else:
-                error_message = f"Error: Invalid encoding type '{encoding_type}'."
-                return df, error_message
+        if encoding_type == 'one-hot':
+            encoder = OneHotEncoder(handle_unknown='ignore', sparse_output=False)
+            encoded_data = encoder.fit_transform(df_encoded[[column]])
+            encoded_df = pd.DataFrame(encoded_data, columns=encoder.get_feature_names_out([column]))
+            df_encoded = pd.concat([df_encoded.drop(column, axis=1), encoded_df], axis=1)
+        elif encoding_type == 'label':
+            encoder = LabelEncoder()
+            df_encoded[f'{column}_encoded'] = encoder.fit_transform(df_encoded[column])
+        elif encoding_type == 'ordinal':
+            encoder = OrdinalEncoder()
+            df_encoded[f'{column}_ordinal'] = encoder.fit_transform(df_encoded[[column]])
+        else:
+            return None, "Error: Invalid encoding type. Use 'one-hot', 'label', or 'ordinal'."
+        
         return df_encoded, None
     except Exception as e:
-        error_message = f"An error occurred during encoding: {e}"
-        return df, error_message
+        return None, f"An unexpected error occurred during encoding: {e}"
 
-def bin_column(df, column, num_bins, new_col_name=None, labels=None):
+def bin_column(df, column, bins):
     """
-    Bins a numeric column into discrete intervals.
+    Divides a numeric column into discrete bins.
 
-    Technical: This function uses pandas.cut to convert continuous data into
-    discrete categorical data. It divides the data into 'num_bins' of equal
-    size or based on custom-defined labels.
+    Technical: This function uses pandas.cut() to segment and sort data values
+    into bins. This process, also known as 'binning' or 'discretization',
+    converts continuous numeric data into categorical data.
 
-    Layman: This function groups numbers into categories. For example, if you
-    have a list of ages, you can group them into 'Child', 'Teenager', 'Adult',
-    etc., instead of using the exact number.
+    Layman: This is useful for turning a column with a wide range of numbers
+    (like 'Age') into a column with a few groups (like 'Child', 'Teen', 'Adult').
+    This can make data easier to work with or visualize.
 
     Args:
         df (pd.DataFrame): The input DataFrame.
-        column (str): The name of the numeric column to bin.
-        num_bins (int or list): The number of equal-sized bins to create, or a list of custom bin edges.
-        new_col_name (str, optional): The name for the new binned column. Defaults to a generated name.
-        labels (list, optional): Labels for the bins. Must be the same length as the number of bins.
+        column (str): The name of the column to bin.
+        bins (int): The number of bins to create.
 
     Returns:
-        tuple: The DataFrame with the new binned column and an error message (if any).
+        tuple: A tuple containing the new DataFrame and an error message (if any).
     """
     df_binned = df.copy()
-    if column not in df_binned.columns or not pd.api.types.is_numeric_dtype(df_binned[column]):
-        return df, f"Error: Column '{column}' not found or is not numeric."
-        
+    if column not in df_binned.columns:
+        return None, f"Error: Column '{column}' not found."
+    if not pd.api.types.is_numeric_dtype(df_binned[column]):
+        return None, "Error: Column must be numeric for binning."
+    
     try:
-        if isinstance(num_bins, int):
-            df_binned[new_col_name or f'{column}_binned'] = pd.cut(df_binned[column], bins=num_bins, labels=labels)
-        else: # Assumes num_bins is a list of custom bins
-            df_binned[new_col_name or f'{column}_binned'] = pd.cut(df_binned[column], bins=num_bins, labels=labels)
-        
+        df_binned[f'{column}_binned'] = pd.cut(df_binned[column], bins=bins, include_lowest=True, right=False)
         return df_binned, None
     except Exception as e:
-        return df, f"An error occurred during binning: {e}"
+        return None, f"An unexpected error occurred during binning: {e}"
