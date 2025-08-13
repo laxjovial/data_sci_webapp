@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-warning text-dark">
+                <h4>Phase 5: Export & Finalize</h4>
+                <p class="mb-0">
+                    <span class="fw-bold">Technical:</span> This module allows you to export the current state of your DataFrame to various formats, including CSV, Excel, and Jupyter Notebooks.
+                    <br>
+                    <span class="fw-bold">Layman:</span> You're ready to save or share your work! Use these options to download your cleaned data or create a notebook report of your analysis.
+                </p>
+            </div>
+            <div class="card-body">
+                {% if error %}
+                <div class="alert alert-danger" role="alert"><strong>Error:</strong> {{ error }}</div>
+                {% endif %}
+
+                <div class="mb-4">
+                    <h5>Current Data Preview</h5>
+                    <div class="table-responsive">
+                        {{ df_head|safe }}
+                    </div>
+                </div>
+                <hr>
+
+                <h5 class="mb-3">Export Options</h5>
+                <div class="row">
+                    <!-- Export to CSV -->
+                    <div class="col-md-6 mb-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">Export as CSV</h5>
+                                <p class="card-text">Download the current dataset as a Comma-Separated Values (.csv) file. This is a universal format for plain text data.</p>
+                                <form action="{{ url_for('export') }}" method="post" style="display: inline;">
+                                    <input type="hidden" name="export_format" value="csv">
+                                    <button type="submit" class="btn btn-primary">Download .csv</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Export to Excel -->
+                    <div class="col-md-6 mb-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">Export as Excel</h5>
+                                <p class="card-text">Download the current dataset as an Excel workbook (.xlsx) file. This preserves data types and is great for sharing with Excel users.</p>
+                                <form action="{{ url_for('export') }}" method="post" style="display: inline;">
+                                    <input type="hidden" name="export_format" value="xlsx">
+                                    <button type="submit" class="btn btn-primary">Download .xlsx</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Export to Jupyter Notebook -->
+                    <div class="col-md-12 mb-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">Export as Jupyter Notebook</h5>
+                                <p class="card-text">Generate a Jupyter Notebook (.ipynb) file containing a summary of your work. You can choose whether to include the Python code for the actions you've taken.</p>
+                                <form action="{{ url_for('export') }}" method="post" class="mt-2">
+                                    <input type="hidden" name="export_format" value="ipynb">
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" name="include_code" value="true" id="include_code_check" checked>
+                                        <label class="form-check-label" for="include_code_check">
+                                            Include Python code log in the notebook
+                                        </label>
+                                    </div>
+                                    <button type="submit" class="btn btn-success">Generate .ipynb</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

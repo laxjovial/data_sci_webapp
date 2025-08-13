@@ -2,112 +2,167 @@
 
 {% block content %}
 <div class="row">
+    <!-- Data Summary Section -->
     <div class="col-md-12">
-        <div class="card shadow-sm">
-            <div class="card-header bg-warning text-white">
-                <h4>Exploratory Data Analysis (EDA)</h4>
-                <p class="mb-0">
-                    <span class="fw-bold">Technical:</span> This module facilitates EDA by providing statistical 
-                    summaries and a robust visualization interface. Users can generate various plot types to 
-                    uncover patterns, trends, and relationships within the dataset.
-                    <br>
-                    <span class="fw-bold">Layman:</span> Now that your data is clean, let's explore it! This is 
-                    where we'll create charts and graphs to help you see what's really going on in your data.
-                </p>
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h4>Data Overview</h4>
             </div>
             <div class="card-body">
-                <ul class="nav nav-tabs" id="edaTab" role="tablist">
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link active" id="stats-tab" data-bs-toggle="tab" data-bs-target="#stats" type="button" role="tab" aria-controls="stats" aria-selected="true">Descriptive Stats</button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="viz-tab" data-bs-toggle="tab" data-bs-target="#viz" type="button" role="tab" aria-controls="viz" aria-selected="false">Plotting</button>
-                    </li>
-                </ul>
-                <div class="tab-content" id="edaTabContent">
-                    <!-- Descriptive Stats Tab -->
-                    <div class="tab-pane fade show active" id="stats" role="tabpanel" aria-labelledby="stats-tab">
-                        <h5 class="mt-3">Dataset Overview (`.info()`)</h5>
-                        <pre>{{ df_info }}</pre>
-                        <hr>
-                        <h5>Descriptive Statistics (`.describe()`)</h5>
-                        {{ df_desc | safe }}
-                        <hr>
-                        <h5>Top 10 Unique Values per Column</h5>
-                        <table class="table table-striped table-bordered table-sm">
-                            <thead>
-                                <tr>
-                                    <th>Column</th>
-                                    <th>Unique Values</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for col, values in unique_values.items() %}
-                                <tr>
-                                    <td>{{ col }}</td>
-                                    <td>{{ values|join(', ') }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                <h5>First 5 Rows</h5>
+                <div class="table-responsive">
+                    {{ df_head|safe }}
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-md-6">
+                        <h5>Data Info</h5>
+                        <pre><code>{{ df_info }}</code></pre>
                     </div>
-
-                    <!-- Plotting Tab -->
-                    <div class="tab-pane fade" id="viz" role="tabpanel" aria-labelledby="viz-tab">
-                        <form action="{{ url_for('data_eda') }}" method="post" class="mt-3">
-                            <div class="mb-3">
-                                <label for="plot_type" class="form-label">Select Plot Type</label>
-                                <select class="form-select" id="plot_type" name="plot_type" required>
-                                    <option value="">-- Select Plot Type --</option>
-                                    <option value="histogram">Histogram</option>
-                                    <option value="boxplot">Box Plot</option>
-                                    <option value="scatter">Scatter Plot</option>
-                                </select>
-                            </div>
-                            <div class="mb-3">
-                                <label for="x_col" class="form-label">Select X-Axis Column</label>
-                                <select class="form-select" id="x_col" name="x_col" required>
-                                    <option value="">-- Select X-Axis Column --</option>
-                                    {% for col in columns %}
-                                    <option value="{{ col }}">{{ col }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="mb-3">
-                                <label for="y_col" class="form-label">Select Y-Axis Column (for Scatter Plot)</label>
-                                <select class="form-select" id="y_col" name="y_col">
-                                    <option value="">-- Select Y-Axis Column --</option>
-                                    {% for col in columns %}
-                                    <option value="{{ col }}">{{ col }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <button type="submit" class="btn btn-warning w-100">Generate Plot</button>
-                        </form>
-
-                        {% if plot_json %}
-                        <div class="mt-4">
-                            <h5 class="text-center">Generated Plot</h5>
-                            {% if error %}
-                            <div class="alert alert-danger" role="alert">
-                                {{ error }}
-                            </div>
-                            {% else %}
-                            <div id="plot"></div>
-                            <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-                            <script>
-                                var plot_data = {{ plot_json | safe }};
-                                Plotly.react('plot', plot_data.data, plot_data.layout);
-                            </script>
-                            {% endif %}
+                    <div class="col-md-6">
+                        <h5>Descriptive Statistics</h5>
+                        <div class="table-responsive">
+                            {{ df_desc|safe }}
                         </div>
-                        {% endif %}
                     </div>
                 </div>
             </div>
         </div>
     </div>
+
+    <!-- EDA Section -->
+    <div class="col-md-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h4>Phase 3: Exploratory Data Analysis (EDA) & Visualization</h4>
+                 <p class="mb-0">
+                    <span class="fw-bold">Technical:</span> This module allows for dynamic generation of univariate, bivariate, and multivariate plots to explore data distributions, relationships, and correlations.
+                    <br>
+                    <span class="fw-bold">Layman:</span> Let's create some charts to understand your data better. You can explore single variables, compare two variables, or see how multiple variables relate to each other.
+                </p>
+            </div>
+            <div class="card-body">
+                {% if error %}
+                <div class="alert alert-danger">{{ error }}</div>
+                {% endif %}
+
+                <form action="{{ url_for('data_eda') }}" method="post">
+                    <div class="mb-3">
+                        <label for="analysis_type_select" class="form-label fw-bold">1. Select Analysis Type</label>
+                        <select class="form-select" id="analysis_type_select" name="analysis_type">
+                            <option value="univariate" selected>Univariate Analysis (explore one variable)</option>
+                            <option value="bivariate">Bivariate Analysis (compare two variables)</option>
+                            <option value="multivariate">Multivariate Analysis (find correlations)</option>
+                        </select>
+                    </div>
+
+                    <!-- Univariate Analysis Form -->
+                    <div id="univariate_form" class="analysis-form">
+                        <div class="mb-3">
+                            <label for="uni_column" class="form-label">Select Column</label>
+                            <select class="form-select" name="uni_column" id="uni_column">
+                                <option value="" selected disabled>-- Choose a column --</option>
+                                {% for column in columns %}
+                                <option value="{{ column }}">{{ column }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Bivariate Analysis Form -->
+                    <div id="bivariate_form" class="analysis-form" style="display: none;">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label for="bi_x_column" class="form-label">Select X-axis Column</label>
+                                <select class="form-select" name="bi_x_column" id="bi_x_column">
+                                     <option value="" selected disabled>-- Choose X --</option>
+                                    {% for column in columns %}
+                                    <option value="{{ column }}">{{ column }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="bi_y_column" class="form-label">Select Y-axis Column</label>
+                                <select class="form-select" name="bi_y_column" id="bi_y_column">
+                                     <option value="" selected disabled>-- Choose Y --</option>
+                                    {% for column in columns %}
+                                    <option value="{{ column }}">{{ column }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Multivariate Analysis Form -->
+                    <div id="multivariate_form" class="analysis-form" style="display: none;">
+                        <div class="mb-3">
+                            <label for="multi_columns" class="form-label">Select Columns (for Correlation Matrix or Pair Plot)</label>
+                            <select class="form-select" name="multi_columns" id="multi_columns" multiple size="8">
+                                {% for column in columns %}
+                                <option value="{{ column }}">{{ column }}</option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text">Hold Ctrl/Cmd to select multiple columns.</div>
+                        </div>
+                    </div>
+
+                    <hr>
+                    <div class="mb-3">
+                        <label for="color_col" class="form-label fw-bold">2. Select Color/Hue Column (Optional)</label>
+                        <select class="form-select" name="color_col" id="color_col">
+                            <option value="">-- None --</option>
+                            {% for column in columns %}
+                            <option value="{{ column }}">{{ column }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">Color-code your plot by the categories in this column.</div>
+                    </div>
+
+                    <button type="submit" class="btn btn-success w-100 mt-3">Generate Plot</button>
+                </form>
+
+                {% if plot_json %}
+                <hr class="my-4">
+                <div class="text-center">
+                    <h4>Generated Plot</h4>
+                    <div id="plot" class="w-100" style="height: 600px;"></div>
+                </div>
+                <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+                <script>
+                    var plot_data = {{ plot_json|safe }};
+                    Plotly.newPlot('plot', plot_data.data, plot_data.layout);
+                </script>
+                {% endif %}
+            </div>
+        </div>
+    </div>
 </div>
-<hr>
-<a href="{{ url_for('feature_engineering') }}" class="btn btn-info">Proceed to Feature Engineering</a>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const analysisSelect = document.getElementById('analysis_type_select');
+    const uniForm = document.getElementById('univariate_form');
+    const biForm = document.getElementById('bivariate_form');
+    const multiForm = document.getElementById('multivariate_form');
+    const forms = [uniForm, biForm, multiForm];
+
+    function toggleForms() {
+        // Hide all forms first
+        forms.forEach(form => form.style.display = 'none');
+
+        // Show the selected one
+        const selectedValue = analysisSelect.value;
+        if (selectedValue === 'univariate') {
+            uniForm.style.display = 'block';
+        } else if (selectedValue === 'bivariate') {
+            biForm.style.display = 'block';
+        } else if (selectedValue === 'multivariate') {
+            multiForm.style.display = 'block';
+        }
+    }
+
+    toggleForms(); // Set initial state
+    analysisSelect.addEventListener('change', toggleForms);
+});
+</script>
 {% endblock %}

@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-info text-white">
+                <h4>Data Filtering</h4>
+                <p class="mb-0">
+                    <span class="fw-bold">Technical:</span> This module allows for dynamic filtering of the DataFrame using boolean indexing based on user-defined conditions.
+                    <br>
+                    <span class="fw-bold">Layman:</span> Use this tool to select and view specific rows from your data. It's like applying a search filter to a big spreadsheet.
+                </p>
+            </div>
+            <div class="card-body">
+                {% if error %}
+                <div class="alert alert-danger" role="alert"><strong>Error:</strong> {{ error }}</div>
+                {% endif %}
+                {% if success %}
+                <div class="alert alert-success" role="alert"><strong>Success:</strong> {{ success }}</div>
+                {% endif %}
+
+                <!-- Filtering Form -->
+                <form action="{{ url_for('data_filtering') }}" method="post" class="border p-3 mb-4">
+                    <h5 class="mb-3">Build a Filter</h5>
+                    <div class="row align-items-end">
+                        <div class="col-md-4">
+                            <label for="filter_col" class="form-label">Column</label>
+                            <select class="form-select" name="filter_col" required>
+                                {% for col in columns %}<option value="{{ col }}">{{ col }}</option>{% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="filter_op" class="form-label">Operator</label>
+                            <select class="form-select" name="filter_op" required>
+                                <option value="==">Equals (=)</option>
+                                <option value="!=">Does Not Equal (≠)</option>
+                                <option value=">">Greater Than (>)</option>
+                                <option value="<">Less Than (<)</option>
+                                <option value=">=">Greater Than or Equal To (≥)</option>
+                                <option value="<=">Less Than or Equal To (≤)</option>
+                                <option value="contains">Contains (for text)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="filter_val" class="form-label">Value</label>
+                            <input type="text" class="form-control" name="filter_val" required>
+                        </div>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-primary w-100">Apply Filter</button>
+                        </div>
+                    </div>
+                </form>
+
+                <!-- Data Preview -->
+                <hr>
+                <h5>Filtered Data Preview</h5>
+                <p>Showing the first 100 rows of the filtered data.</p>
+                <div class="table-responsive">
+                    {{ df_head|safe }}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
