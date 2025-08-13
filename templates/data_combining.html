@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-purple text-white" style="background-color: #6f42c1;">
+                <h4>Data Combining (Merge, Concat, Join)</h4>
+                <p class="mb-0">Combine your current dataset with a second one.</p>
+            </div>
+            <div class="card-body">
+                {% if error %}
+                <div class="alert alert-danger" role="alert"><strong>Error:</strong> {{ error }}</div>
+                {% endif %}
+                {% if success %}
+                <div class="alert alert-success" role="alert"><strong>Success:</strong> {{ success }}</div>
+                {% endif %}
+
+                <!-- Step 1: Left DataFrame Preview -->
+                <h5 class="mb-3">1. Primary (Left) DataFrame</h5>
+                <div class="table-responsive mb-4" style="max-height: 300px;">
+                    {{ left_df_head|safe }}
+                </div>
+                <hr>
+
+                <!-- Step 2: Upload Right DataFrame -->
+                <h5 class="mb-3">2. Upload Second (Right) DataFrame</h5>
+                <form action="{{ url_for('data_combining') }}" method="post" enctype="multipart/form-data" class="border p-3 mb-4">
+                    <input type="hidden" name="action" value="upload_right_df">
+                    <div class="mb-3">
+                        <label for="file_right" class="form-label">Choose a file to combine with:</label>
+                        <input type="file" class="form-control" id="file_right" name="file_right" accept=".csv, .xls, .xlsx" required>
+                    </div>
+                    <button type="submit" class="btn btn-secondary">Upload Second DataFrame</button>
+                </form>
+
+                {% if right_df_head %}
+                <hr>
+                <h5 class="mb-3">Preview of Second (Right) DataFrame</h5>
+                 <div class="table-responsive mb-4" style="max-height: 300px;">
+                    {{ right_df_head|safe }}
+                </div>
+                <hr>
+
+                <!-- Step 3: Configure and Perform Combination -->
+                <h5 class="mb-3">3. Configure Combination</h5>
+                <ul class="nav nav-tabs mb-3" id="pills-tab" role="tablist">
+                    <li class="nav-item" role="presentation"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#pills-merge" type="button">Merge</button></li>
+                    <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#pills-concat" type="button">Concat</button></li>
+                </ul>
+
+                <div class="tab-content border p-3" id="pills-tabContent">
+                    <!-- Merge Form -->
+                    <div class="tab-pane fade show active" id="pills-merge" role="tabpanel">
+                        <form action="{{ url_for('data_combining') }}" method="post">
+                            <input type="hidden" name="action" value="perform_combine">
+                            <input type="hidden" name="method" value="merge">
+                            <p class="form-text">Database-style join. Select columns to match rows on.</p>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Key(s) from Left DF:</label>
+                                    <select class="form-select" name="left_on" multiple size="4">
+                                        {% for col in left_cols %}<option value="{{ col }}">{{ col }}</option>{% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Key(s) from Right DF:</label>
+                                    <select class="form-select" name="right_on" multiple size="4">
+                                        {% for col in right_cols %}<option value="{{ col }}">{{ col }}</option>{% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Join Type (how):</label>
+                                <select class="form-select" name="how">
+                                    <option value="inner">Inner (only matching rows)</option>
+                                    <option value="left">Left (all rows from left, matches from right)</option>
+                                    <option value="right">Right (all rows from right, matches from left)</option>
+                                    <option value="outer">Outer (all rows from both)</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Perform Merge</button>
+                        </form>
+                    </div>
+                    <!-- Concat Form -->
+                    <div class="tab-pane fade" id="pills-concat" role="tabpanel">
+                        <form action="{{ url_for('data_combining') }}" method="post">
+                            <input type="hidden" name="action" value="perform_combine">
+                            <input type="hidden" name="method" value="concat">
+                            <p class="form-text">Stack datasets on top of each other (rows) or side-by-side (columns).</p>
+                             <div class="mb-3">
+                                <label class="form-label">Axis:</label>
+                                <select class="form-select" name="axis">
+                                    <option value="0">Rows (axis=0)</option>
+                                    <option value="1">Columns (axis=1)</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Perform Concat</button>
+                        </form>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Result Preview -->
+                {% if result_df_head %}
+                <hr>
+                <h5 class="mb-3">Result of Combination</h5>
+                <div class="table-responsive">
+                    {{ result_df_head|safe }}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

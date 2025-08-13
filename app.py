@@ -16,6 +16,7 @@ from utils.data_engineering import (
 from utils.data_filtering import filter_dataframe
 from utils.data_aggregation import group_by_aggregate, pivot_table
 
+from utils.data_combining import combine_dataframes
 from utils.modeling import get_model_list, run_models, get_hyperparameter_grid, tune_model_hyperparameters
 
 from utils.eda import generate_univariate_plot, generate_bivariate_plot, generate_multivariate_plot
@@ -438,6 +439,83 @@ def data_aggregation():
                            columns=columns, df=df, result_df_head=result_df_head,
                            error=new_error_message, success=success_message,
                            current_stage=current_stage, progress_percent=progress_percent)
+
+
+
+@app.route('/data_combining', methods=['GET', 'POST'])
+def data_combining():
+    left_df, error_message = _get_df_from_filepath()
+    if error_message:
+        return redirect(url_for('index'))
+
+    new_error_message = None
+    success_message = None
+    right_df_head = None
+    result_df_head = None
+    left_cols = left_df.columns.tolist()
+    right_cols = []
+
+    # Handle POST requests
+    if request.method == 'POST':
+        action = request.form.get('action')
+        try:
+            if action == 'upload_right_df':
+                file = request.files.get('file_right')
+                if file and file.filename:
+                    right_df, new_error_message = load_data(source_type='upload', source_path_or_file=file)
+                    if new_error_message is None:
+                        # Save the right df to a temporary path in session
+                        right_filename = f"right_{uuid.uuid4()}.csv"
+                        right_filepath = os.path.join(app.config['UPLOAD_FOLDER'], right_filename)
+                        right_df.to_csv(right_filepath, index=False)
+                        session['filepath_right'] = right_filepath
+                        success_message = "Second DataFrame uploaded successfully."
+                else:
+                    new_error_message = "No file selected for upload."
+
+            elif action == 'perform_combine':
+                if 'filepath_right' in session:
+                    right_df = pd.read_csv(session['filepath_right'])
+                    method = request.form.get('method')
+
+                    params = {}
+                    if method == 'merge':
+                        params['left_on'] = request.form.getlist('left_on')
+                        params['right_on'] = request.form.getlist('right_on')
+                        params['how'] = request.form.get('how')
+                    elif method == 'concat':
+                        params['axis'] = int(request.form.get('axis', 0))
+
+                    combined_df, new_error_message = combine_dataframes(left_df, right_df, method, **params)
+
+                    if new_error_message is None:
+                        # Overwrite the main df with the result
+                        _save_df_to_filepath(combined_df)
+                        result_df_head = combined_df.head().to_html(classes=['table', 'table-striped', 'table-sm'])
+                        success_message = f"DataFrames combined successfully using '{method}'."
+                        # Clean up the right dataframe from session and disk
+                        os.remove(session['filepath_right'])
+                        session.pop('filepath_right', None)
+                else:
+                    new_error_message = "Please upload the second DataFrame first."
+
+        except Exception as e:
+            new_error_message = f"An error occurred: {e}"
+
+    # Prepare variables for GET request or re-rendering
+    left_df_head = left_df.head().to_html(classes=['table', 'table-striped', 'table-sm'])
+    if 'filepath_right' in session and os.path.exists(session['filepath_right']):
+        right_df = pd.read_csv(session['filepath_right'])
+        right_df_head = right_df.head().to_html(classes=['table', 'table-striped', 'table-sm'])
+        right_cols = right_df.columns.tolist()
+
+    return render_template('data_combining.html',
+                           left_df_head=left_df_head, right_df_head=right_df_head,
+                           left_cols=left_cols, right_cols=right_cols,
+                           error=new_error_message, success=success_message,
+                           result_df_head=result_df_head,
+                           current_stage="Data Combining", progress_percent=30)
+
 
 
 @app.route('/model_building', methods=['GET', 'POST'])
