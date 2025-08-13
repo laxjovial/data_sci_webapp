@@ -104,3 +104,39 @@ def apply_encoding(df, columns, encoding_type, **kwargs):
     except Exception as e:
         error_message = f"An error occurred during encoding: {e}"
         return df, error_message
+
+def bin_column(df, column, num_bins, new_col_name=None, labels=None):
+    """
+    Bins a numeric column into discrete intervals.
+
+    Technical: This function uses pandas.cut to convert continuous data into
+    discrete categorical data. It divides the data into 'num_bins' of equal
+    size or based on custom-defined labels.
+
+    Layman: This function groups numbers into categories. For example, if you
+    have a list of ages, you can group them into 'Child', 'Teenager', 'Adult',
+    etc., instead of using the exact number.
+
+    Args:
+        df (pd.DataFrame): The input DataFrame.
+        column (str): The name of the numeric column to bin.
+        num_bins (int or list): The number of equal-sized bins to create, or a list of custom bin edges.
+        new_col_name (str, optional): The name for the new binned column. Defaults to a generated name.
+        labels (list, optional): Labels for the bins. Must be the same length as the number of bins.
+
+    Returns:
+        tuple: The DataFrame with the new binned column and an error message (if any).
+    """
+    df_binned = df.copy()
+    if column not in df_binned.columns or not pd.api.types.is_numeric_dtype(df_binned[column]):
+        return df, f"Error: Column '{column}' not found or is not numeric."
+        
+    try:
+        if isinstance(num_bins, int):
+            df_binned[new_col_name or f'{column}_binned'] = pd.cut(df_binned[column], bins=num_bins, labels=labels)
+        else: # Assumes num_bins is a list of custom bins
+            df_binned[new_col_name or f'{column}_binned'] = pd.cut(df_binned[column], bins=num_bins, labels=labels)
+        
+        return df_binned, None
+    except Exception as e:
+        return df, f"An error occurred during binning: {e}"
