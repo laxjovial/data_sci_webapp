@@ -26,15 +26,16 @@ def handle_missing_values(df, columns, strategy):
     """
     df_cleaned = df.copy()
     if strategy == 'drop':
-        df_cleaned.dropna(subset=columns, inplace=True)
+        df_cleaned = df_cleaned.dropna(subset=columns)
     else:
         for col in columns:
-            if strategy == 'mean' and pd.api.types.is_numeric_dtype(df_cleaned[col]):
-                df_cleaned[col].fillna(df_cleaned[col].mean(), inplace=True)
-            elif strategy == 'median' and pd.api.types.is_numeric_dtype(df_cleaned[col]):
-                df_cleaned[col].fillna(df_cleaned[col].median(), inplace=True)
+            if pd.api.types.is_numeric_dtype(df_cleaned[col]):
+                if strategy == 'mean':
+                    df_cleaned[col] = df_cleaned[col].fillna(df_cleaned[col].mean())
+                elif strategy == 'median':
+                    df_cleaned[col] = df_cleaned[col].fillna(df_cleaned[col].median())
             elif strategy == 'mode':
-                df_cleaned[col].fillna(df_cleaned[col].mode()[0], inplace=True)
+                df_cleaned[col] = df_cleaned[col].fillna(df_cleaned[col].mode()[0])
     return df_cleaned
 
 def rename_column(df, old_col, new_col):
@@ -42,7 +43,7 @@ def rename_column(df, old_col, new_col):
     Renames a single column in the DataFrame.
 
     Technical: Uses the pandas.DataFrame.rename method with a dictionary mapping.
-    This is an in-place operation that changes the column name permanently.
+    This returns a new DataFrame with the column renamed.
 
     Layman: This simply changes the name of a column to whatever you want.
 
@@ -85,8 +86,12 @@ def convert_dtype(df, column, new_type):
             df_cleaned[column] = pd.to_datetime(df_cleaned[column], errors='coerce')
         else:
             df_cleaned[column] = df_cleaned[column].astype(new_type)
-    except Exception as e:
+    except (ValueError, TypeError) as e:
         error_message = f"Error converting column '{column}' to type '{new_type}': {e}"
+        df_cleaned = df.copy() # Revert changes on error
+    except Exception as e:
+        error_message = f"An unexpected error occurred during conversion: {e}"
+        df_cleaned = df.copy()
     return df_cleaned, error_message
 
 def remove_duplicates(df):
@@ -111,12 +116,11 @@ def standardize_text(df, columns):
     """
     Standardizes text data in specified columns.
 
-    Technical: Iterates through the specified columns and applies string methods
-    to trim whitespace, convert to lowercase, and handle null values gracefully.
+    Technical: Iterates through the specified columns and applies string methods to trim whitespace,
+    convert to lowercase, and handle null values gracefully.
 
-    Layman: This makes all the text in a column look the same. For example, it
-    will change " NEW YORK " and "New York" to "new york", so the app sees them
-    as the same thing.
+    Layman: This makes all the text in a column look the same. For example, it will change
+    " NEW YORK " and "New York" to "new york", so the app sees them as the same thing.
 
     Args:
         df (pd.DataFrame): The input DataFrame.
@@ -128,134 +132,5 @@ def standardize_text(df, columns):
     df_cleaned = df.copy()
     for col in columns:
         if pd.api.types.is_string_dtype(df_cleaned[col]):
-            df_cleaned[col] = df_cleaned[col].astype(str).str.strip().str.lower()
+            df_cleaned[col] = df_cleaned[col].str.strip().str.lower()
     return df_cleaned
-
-def handle_outliers(df, column, method, value=None):
-    """
-    Handles outliers in a numerical column using different methods.
-
-    Technical: Implements the IQR (Interquartile Range) method to detect outliers
-    and allows for either removal or capping. The IQR method calculates the
-    upper and lower bounds (Q3 + 1.5*IQR and Q1 - 1.5*IQR) and either filters
-    out values outside this range or replaces them with the boundary values.
-
-    Layman: This is for dealing with numbers that are way too big or too small
-    compared to the rest of the data. You can either get rid of those extreme
-    numbers or "cap" them, which means replacing them with the highest or lowest
-    acceptable value. This helps prevent them from messing up your analysis.
-
-    Args:
-        df (pd.DataFrame): The input DataFrame.
-        column (str): The numerical column to check for outliers.
-        method (str): The method to use ('remove' or 'cap').
-        value (float, optional): A specific value to use for capping.
-
-    Returns:
-        pd.DataFrame: The DataFrame with outliers handled.
-        str: An error message if the column is not numeric.
-    """
-    if not pd.api.types.is_numeric_dtype(df[column]):
-        return df, "Error: Outlier handling is only for numeric columns."
-
-    df_cleaned = df.copy()
-    Q1 = df_cleaned[column].quantile(0.25)
-    Q3 = df_cleaned[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-
-    if method == 'remove':
-        df_cleaned = df_cleaned[(df_cleaned[column] >= lower_bound) & (df_cleaned[column] <= upper_bound)]
-    elif method == 'cap':
-        df_cleaned[column] = np.where(df_cleaned[column] > upper_bound, upper_bound, df_cleaned[column])
-        df_cleaned[column] = np.where(df_cleaned[column] < lower_bound, lower_bound, df_cleaned[column])
-    elif method == 'custom_cap' and value is not None:
-        df_cleaned[column] = np.where(df_cleaned[column] > value, value, df_cleaned[column])
-        df_cleaned[column] = np.where(df_cleaned[column] < -value, -value, df_cleaned[column])
-        
-    return df_cleaned, None
-
-def correct_inconsistencies(df, column, mapping_dict):
-    """
-    Corrects inconsistent entries in a categorical column using a mapping dictionary.
-
-    Technical: Uses the pandas.DataFrame.replace method to map old, inconsistent
-    values to new, standardized values as defined by a dictionary.
-
-    Layman: This helps you fix typos and different spellings in a column. For
-    example, you can tell the app to change "NY" and "New York City" to
-    the standard "New York."
-
-    Args:
-        df (pd.DataFrame): The input DataFrame.
-        column (str): The column containing inconsistent values.
-        mapping_dict (dict): A dictionary with inconsistent values as keys
-                             and the correct value as the value.
-
-    Returns:
-        pd.DataFrame: The DataFrame with corrected entries.
-    """
-    df_cleaned = df.copy()
-    if column in df_cleaned.columns:
-        df_cleaned[column] = df_cleaned[column].replace(mapping_dict)
-    return df_cleaned
-
-def format_date_column(df, column, date_format=None):
-    """
-    Converts a column to datetime objects with an optional format string.
-
-    Technical: Uses pd.to_datetime to parse date strings. If a format string
-    is provided, it enforces that format during parsing. errors='coerce' will
-    turn unparseable values into NaT (Not a Time).
-
-    Layman: This tool correctly interprets a text column as dates. If your dates
-    are in a weird format, you can tell the app exactly how to read them.
-
-    Args:
-        df (pd.DataFrame): The input DataFrame.
-        column (str): The name of the column to format.
-        date_format (str, optional): The strftime format string. E.g., '%Y-%m-%d'.
-
-    Returns:
-        pd.DataFrame: The DataFrame with the formatted date column.
-        str: An error message if conversion fails.
-    """
-    df_cleaned = df.copy()
-    error_message = None
-    try:
-        df_cleaned[column] = pd.to_datetime(df_cleaned[column], format=date_format, errors='coerce')
-    except Exception as e:
-        error_message = f"Error formatting date column '{column}': {e}"
-
-    return df_cleaned, error_message
-
-def sort_dataframe(df, columns, ascending_list):
-    """
-    Sorts the DataFrame by specified columns and orders.
-    """
-    df_cleaned = df.copy()
-    try:
-        df_cleaned = df_cleaned.sort_values(by=columns, ascending=ascending_list)
-    except Exception as e:
-        return df, f"Error sorting data: {e}"
-    return df_cleaned, None
-
-def reset_dataframe_index(df):
-    """
-    Resets the DataFrame index.
-    """
-    df_cleaned = df.copy()
-    df_cleaned = df_cleaned.reset_index(drop=True)
-    return df_cleaned, None
-
-def drop_columns(df, columns):
-    """
-    Drops specified columns from the DataFrame.
-    """
-    df_cleaned = df.copy()
-    try:
-        df_cleaned = df_cleaned.drop(columns=columns)
-    except Exception as e:
-        return df, f"Error dropping columns: {e}"
-    return df_cleaned, None
