@@ -17,7 +17,7 @@ from utils.data_aggregation import group_by_aggregate
 from utils.data_filtering import filter_dataframe
 from utils.data_engineering import create_new_feature, apply_encoding, bin_column
 from utils.eda import generate_univariate_plot, generate_bivariate_plot
-from utils.modeling import run_models, tune_model
+from utils.modeling import run_models
 from utils.data_export import export_data
 
 app = Flask(__name__)
@@ -69,8 +69,7 @@ def upload_file():
         flash('No selected file', 'danger')
         return redirect(url_for('index'))
     if file:
-        filename = secure_filename(file.filename)
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(file.filename))
         file.save(filepath)
         df, error = load_data(source_type='upload', source_path_or_file=filepath)
         if error:
@@ -97,7 +96,6 @@ def ingest_url():
 @app.route('/projects')
 def projects():
     # This route would list saved projects, which requires a database or file storage
-    # For this example, we'll assume a static list or an empty one
     projects = [] # Replace with actual project loading logic
     return render_template('projects.html', projects=projects)
 
@@ -306,23 +304,6 @@ def model_building():
                 save_plot_to_session(cm_plot, 'confusion_matrix_plot')
                 flash('Models run successfully!', 'success')
         
-        elif action == 'tune_model':
-            model_name = request.form.get('model_name')
-            method = request.form.get('method')
-            param_grid_str = request.form.get('param_grid')
-            
-            try:
-                param_grid = json.loads(param_grid_str)
-            except json.JSONDecodeError:
-                flash('Invalid JSON for parameter grid.', 'danger')
-                return redirect(url_for('model_building'))
-
-            # We need to retrieve the original data and split it again
-            # This is a simplified example, a real app would need to store split data
-            # For now, we'll re-run run_models to get the necessary data.
-            # You should handle this more robustly in a real application.
-            flash('Tuning functionality is a placeholder. Please implement a robust solution.', 'warning')
-
         return redirect(url_for('model_building'))
     
     columns = df.columns.tolist()
