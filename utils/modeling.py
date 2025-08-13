@@ -110,6 +110,7 @@ def create_confusion_matrix_plot(y_true, y_pred, labels):
     fig.update_layout(title_text='Confusion Matrix')
     return fig.to_json()
 
+
 def get_hyperparameter_grid():
     """
     Returns a dictionary of hyperparameters for tuning each model.
@@ -202,3 +203,4 @@ def tune_model_hyperparameters(df, features, target, problem_type, model_name, p
         }
 
     return final_metrics
+
