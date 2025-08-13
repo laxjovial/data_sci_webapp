@@ -58,81 +58,59 @@ def load_data(source_type, source_path_or_file):
 
     Args:
         source_type (str): The type of data source ('url', 'upload').
-        source_path_or_file (str or werkzeug.FileStorage): The URL string or
-                                                             the uploaded file object.
+        source_path_or_file (str or werkzeug.FileStorage): The URL string or the uploaded file object.
 
     Returns:
         tuple: A pandas DataFrame and an error message (if any).
     """
     df = None
     error_message = None
-    
     try:
         if source_type == 'url':
             # Handle GitHub raw links
-            if 'github.com' in source_path_or_file and 'raw.githubusercontent.com' not in source_path_or_file:
-                source_path_or_file = source_path_or_file.replace('github.com', 'raw.githubusercontent.com').replace('/blob/', '/')
-            
-            # Handle Google Drive links
-            if 'drive.google.com' in source_path_or_file or 'docs.google.com' in source_path_or_file:
+            if 'github.com' in source_path_or_file:
+                source_path_or_file = source_path_or_file.replace(
+                    'github.com', 'raw.githubusercontent.com').replace(
+                    '/blob/', '/')
+            # Handle Google Drive URLs
+            elif 'drive.google.com' in source_path_or_file:
                 source_path_or_file = _convert_gdrive_url(source_path_or_file)
-            
-            # Make the request and read into a DataFrame
+
             response = requests.get(source_path_or_file)
-            response.raise_for_status() # Raise an error for bad status codes
+            response.raise_for_status() # Raise an exception for bad status codes
             
-            content_type = response.headers.get('Content-Type', '')
+            content = io.StringIO(response.text)
             
-            if 'csv' in content_type or source_path_or_file.endswith('.csv'):
-                df = pd.read_csv(io.StringIO(response.text))
-            elif 'excel' in content_type or source_path_or_file.endswith('.xlsx') or source_path_or_file.endswith('.xls'):
+            # Infer file type from URL or content
+            file_extension = os.path.splitext(urllib.parse.urlparse(source_path_or_file).path)[1]
+            if file_extension == '.csv' or response.headers['content-type'] == 'text/csv':
+                df = pd.read_csv(content)
+            elif file_extension in ['.xls', '.xlsx']:
                 df = pd.read_excel(io.BytesIO(response.content))
+            elif file_extension == '.json':
+                df = pd.read_json(content)
             else:
-                error_message = f"Unsupported file type from URL: {source_path_or_file}"
-        
+                error_message = f"Unsupported file type from URL: {file_extension}"
+                return None, error_message
+
         elif source_type == 'upload':
             filename = source_path_or_file.filename
             if filename.endswith('.csv'):
                 df = pd.read_csv(source_path_or_file)
-            elif filename.endswith('.xlsx') or filename.endswith('.xls'):
+            elif filename.endswith(('.xls', '.xlsx')):
                 df = pd.read_excel(source_path_or_file)
+            elif filename.endswith('.json'):
+                df = pd.read_json(source_path_or_file)
             else:
-                error_message = f"Unsupported file type for upload: {filename}. Please upload a CSV or Excel file."
-                
+                error_message = f"Unsupported file type uploaded: {filename}"
+                return None, error_message
+
+        else:
+            error_message = "Invalid source type specified."
+            return None, error_message
+
+        return df, None
     except requests.exceptions.RequestException as e:
-        error_message = f"Failed to retrieve data from URL: {e}"
+        return None, f"Network error during data ingestion: {e}"
     except Exception as e:
-        error_message = f"An unexpected error occurred during data loading: {e}"
-
-    return df, error_message
-    
-def get_dataframe_summary(df):
-    """
-    Generates a summary of the DataFrame for display.
-
-    Technical: This is a utility function that generates HTML and string 
-    representations of the DataFrame's head, info, and descriptive statistics. 
-    It also extracts column names and unique values for categorical columns, 
-    making it easier to display these details in the web interface.
-
-    Args:
-        df (pd.DataFrame): The input DataFrame.
-
-    Returns:
-        tuple: (df_head_html, df_info_str, df_desc_html, columns, unique_values_dict)
-    """
-    df_head_html = df.head().to_html(classes=['table', 'table-striped', 'table-sm'])
-    
-    buf = io.StringIO()
-    df.info(buf=buf)
-    info_str = buf.getvalue()
-    
-    df_desc_html = df.describe().to_html(classes=['table', 'table-striped', 'table-sm'])
-    columns = df.columns.tolist()
-    
-    unique_values = {}
-    for col in df.columns:
-        if df[col].nunique() < 20 and df[col].dtype == 'object':
-            unique_values[col] = df[col].unique().tolist()
-    
-    return df_head_html, info_str, df_desc_html, columns, unique_values
+        return None, f"An error occurred during data ingestion: {e}"
