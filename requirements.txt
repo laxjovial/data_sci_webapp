@@ -5,9 +5,9 @@ scikit-learn
 plotly
 requests
 openpyxl
-
+xgboost
 gunicorn
 lightgbm
 catboost
 scikit-optimize
-
+nbformat
