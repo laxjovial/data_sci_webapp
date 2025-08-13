@@ -18,7 +18,7 @@ from utils.data_filtering import filter_dataframe
 from utils.data_engineering import create_new_feature, apply_encoding, bin_column
 from utils.eda import generate_univariate_plot, generate_bivariate_plot
 from utils.modeling import run_models
-from utils.data_export import export_data
+from utils.data_export import export_dataframe
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'  # Change this to a secure, random key in production
@@ -321,13 +321,17 @@ def export():
     
     if request.method == 'POST':
         file_format = request.form.get('file_format')
-        output_filename = f'exported_data_{str(uuid.uuid4())[:8]}.{file_format}'
-        output_path = os.path.join(app.config['UPLOAD_FOLDER'], output_filename)
         
-        export_data(df, output_path, file_format)
+        # The file is saved and returned directly
+        file_content, mime_type = export_dataframe(df, file_format)
         
-        return send_file(output_path, as_attachment=True, mimetype='application/octet-stream')
-
+        if file_content:
+            output_filename = f'exported_data_{str(uuid.uuid4())[:8]}.{file_format}'
+            return send_file(io.BytesIO(file_content), as_attachment=True, mimetype=mime_type, download_name=output_filename)
+        else:
+            flash(mime_type, 'danger')
+            return redirect(url_for('export'))
+        
     return render_template('export.html')
 
 @app.route('/user_guide')
