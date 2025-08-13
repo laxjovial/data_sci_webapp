@@ -10,6 +10,7 @@ import plotly.express as px
 import plotly.figure_factory as ff
 
 # Classification Models
+
 from sklearn.linear_model import LogisticRegression, SGDClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
@@ -31,17 +32,21 @@ from lightgbm import LGBMRegressor
 from catboost import CatBoostRegressor
 from sklearn.linear_model import BayesianRidge
 
+
 def get_model_list():
     """
     Returns a dictionary of available classification and regression models.
     """
     models = {
         "Classification": {
+
             "Logistic Regression": LogisticRegression(max_iter=1000),
+
             "K-Nearest Neighbors": KNeighborsClassifier(),
             "Support Vector Machine": SVC(probability=True),
             "Decision Tree": DecisionTreeClassifier(),
             "Random Forest": RandomForestClassifier(),
+
             "Extra Trees": ExtraTreesClassifier(),
             "AdaBoost": AdaBoostClassifier(),
             "Gradient Boosting": GradientBoostingClassifier(),
@@ -50,22 +55,27 @@ def get_model_list():
             "CatBoost": CatBoostClassifier(verbose=0),
             "Gaussian Naive Bayes": GaussianNB(),
             "SGD Classifier": SGDClassifier(),
+
         },
         "Regression": {
             "Linear Regression": LinearRegression(),
             "Ridge Regression": Ridge(),
             "Lasso Regression": Lasso(),
+
             "ElasticNet": ElasticNet(),
+
             "K-Neighbors Regressor": KNeighborsRegressor(),
             "Support Vector Regressor": SVR(),
             "Decision Tree Regressor": DecisionTreeRegressor(),
             "Random Forest Regressor": RandomForestRegressor(),
+
             "Extra Trees Regressor": ExtraTreesRegressor(),
             "Gradient Boosting Regressor": GradientBoostingRegressor(),
             "XGBoost Regressor": XGBRegressor(eval_metric='rmse'),
             "LightGBM Regressor": LGBMRegressor(),
             "CatBoost Regressor": CatBoostRegressor(verbose=0),
             "Bayesian Ridge": BayesianRidge(),
+
         }
     }
     return models
@@ -176,10 +186,12 @@ def get_hyperparameter_grid():
                 'n_estimators': [100, 200],
                 'max_depth': [None, 10, 20]
             },
+
             "Extra Trees": {
                 'n_estimators': [100, 200],
                 'max_depth': [None, 10, 20]
             },
+
             "AdaBoost": {
                 'n_estimators': [50, 100],
                 'learning_rate': [0.01, 0.1, 1]
@@ -192,6 +204,7 @@ def get_hyperparameter_grid():
                 'n_estimators': [100, 200],
                 'learning_rate': [0.01, 0.1, 0.2],
                 'max_depth': [3, 5, 7]
+
             },
             "LightGBM": {
                 'n_estimators': [100, 200],
@@ -214,9 +227,11 @@ def get_hyperparameter_grid():
             "ElasticNet": {'alpha': [0.1, 1.0, 10.0], 'l1_ratio': [0.2, 0.5, 0.8]},
             "Random Forest Regressor": {'n_estimators': [100, 200], 'max_depth': [None, 10, 20]},
             "Extra Trees Regressor": {'n_estimators': [100, 200], 'max_depth': [None, 10, 20]},
+
         }
     }
     return grids
+
 
 def tune_model_hyperparameters(df, features, target, problem_type, model_name, param_grid, method='grid', test_size=0.3, random_state=42):
     """
@@ -226,6 +241,7 @@ def tune_model_hyperparameters(df, features, target, problem_type, model_name, p
     from skopt import BayesSearchCV
     from skopt.space import Real, Categorical, Integer
 
+
     X = df[features]
     y = df[target]
 
@@ -234,6 +250,7 @@ def tune_model_hyperparameters(df, features, target, problem_type, model_name, p
     )
 
     model = get_model_list()[problem_type][model_name]
+
     scoring = 'f1_weighted' if problem_type == "Classification" else 'r2'
 
     search_cv = None
@@ -282,3 +299,4 @@ def tune_model_hyperparameters(df, features, target, problem_type, model_name, p
         return final_metrics
 
     return {"Error": "Invalid tuning method specified."}
+

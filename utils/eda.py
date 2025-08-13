@@ -2,15 +2,18 @@ import pandas as pd
 import plotly.express as px
 import plotly.io as pio
 
+
 def generate_univariate_plot(df, column, plot_type='histogram', color=None):
     """
     Generates a univariate plot for a given column.
     """
     title = f'Univariate Analysis of {column}'
+
     if color:
         title += f' by {color}'
 
     if pd.api.types.is_numeric_dtype(df[column]):
+
         if plot_type == 'histogram':
             fig = px.histogram(df, x=column, color=color, title=title, marginal='box', barmode='overlay')
         elif plot_type == 'violin':
@@ -58,6 +61,7 @@ def generate_bivariate_plot(df, x_col, y_col, plot_type='scatter', color=None):
     # Both Categorical
     else:
         # Heatmap is standard here, color is ignored.
+
         crosstab = pd.crosstab(df[x_col], df[y_col])
         fig = px.imshow(crosstab, title=f'Heatmap of {x_col} vs. {y_col}', text_auto=True)
 

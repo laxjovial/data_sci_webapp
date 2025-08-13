@@ -54,6 +54,7 @@
                             <option value="bivariate">Bivariate Analysis (compare two variables)</option>
                             <option value="multivariate">Multivariate Analysis (find correlations)</option>
                         </select>
+
                     </div>
 
                     <!-- Univariate Analysis Form -->
@@ -84,6 +85,7 @@
                     <div id="bivariate_form" class="analysis-form" style="display: none;">
                         <div class="row">
                              <div class="col-md-4 mb-3">
+
                                 <label for="bi_x_column" class="form-label">Select X-axis Column</label>
                                 <select class="form-select" name="bi_x_column" id="bi_x_column">
                                      <option value="" selected disabled>-- Choose X --</option>
@@ -92,7 +94,9 @@
                                     {% endfor %}
                                 </select>
                             </div>
+
                              <div class="col-md-4 mb-3">
+
                                 <label for="bi_y_column" class="form-label">Select Y-axis Column</label>
                                 <select class="form-select" name="bi_y_column" id="bi_y_column">
                                      <option value="" selected disabled>-- Choose Y --</option>
@@ -101,6 +105,7 @@
                                     {% endfor %}
                                 </select>
                             </div>
+
                             <div class="col-md-4 mb-3">
                                 <label for="bi_plot_type" class="form-label">Plot Type</label>
                                 <select class="form-select" name="bi_plot_type" id="bi_plot_type">
@@ -124,6 +129,7 @@
                             <div class="form-text">Hold Ctrl/Cmd to select multiple columns.</div>
                         </div>
                     </div>
+
 
                     <hr>
                     <div class="mb-3">
