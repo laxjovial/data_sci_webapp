@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h3>User Guide</h3>
+                <p class="mb-0">A step-by-step guide to using the Comprehensive Data Science Web Application.</p>
+            </div>
+            <div class="card-body">
+                <article>
+                    <h4 class="mt-4">Phase 1: Data Ingestion</h4>
+                    <p>This is the starting point of your analysis. The goal is to load your dataset into the application.</p>
+                    <ol>
+                        <li><strong>Choose your source:</strong> Use the dropdown menu to select whether you want to "Upload from Device" or load "From a Web Link (URL)".</li>
+                        <li>
+                            <strong>If uploading from device:</strong>
+                            <ul>
+                                <li>Click the "Choose a File" button.</li>
+                                <li>Select a CSV or Excel file from your computer.</li>
+                            </ul>
+                        </li>
+                        <li>
+                            <strong>If using a web link:</strong>
+                            <ul>
+                                <li>Paste the URL into the input field.</li>
+                                <li>The application supports direct links to CSV/Excel files, as well as links to files on GitHub and Google Drive. For Google Drive, ensure the file is shared so that "anyone with the link can view".</li>
+                            </ul>
+                        </li>
+                        <li>Click the "Load Dataset" button. You will then be taken to the Data Viewer page to see a summary of your data.</li>
+                    </ol>
+
+                    <hr class="my-4">
+
+                    <h4 class="mt-4">Phase 2: Data Cleaning</h4>
+                    <p>Once your data is loaded, the next step is to clean it. This page provides several tools to fix common data quality issues. Use the tabs to navigate between different cleaning actions.</p>
+                    <ul>
+                        <li><strong>Handle Missing Values:</strong> Select one or more columns and choose a strategy (e.g., 'drop', 'fill with mean') to handle empty cells.</li>
+                        <li><strong>Convert Data Type:</strong> Change the type of a column, for example, from text to a number.</li>
+                        <li><strong>Remove Duplicates:</strong> Click the button to remove any identical rows in your dataset.</li>
+                        <li><strong>Standardize Text:</strong> Clean up text columns by making them all lowercase, uppercase, etc.</li>
+                        <li><strong>Handle Outliers:</strong> Manage extreme numerical values that could skew your results.</li>
+                        <li><strong>Correct Inconsistencies:</strong> Fix typos or merge similar categories (e.g., 'USA' and 'United States') by providing a Python dictionary of mappings.</li>
+                    </ul>
+                    <p>After each action, the data preview at the top of the page will update to reflect your changes.</p>
+
+                    <hr class="my-4">
+
+                    <h4 class="mt-4">Phase 3: Exploratory Data Analysis (EDA)</h4>
+                    <p>This is where you get to explore your data visually. Creating plots helps you understand distributions, find relationships, and discover patterns.</p>
+                    <ol>
+                        <li><strong>Select Analysis Type:</strong>
+                            <ul>
+                                <li><strong>Univariate:</strong> To explore a single variable (e.g., the distribution of 'Age').</li>
+                                <li><strong>Bivariate:</strong> To compare two variables (e.g., 'Age' vs. 'Income').</li>
+                                <li><strong>Multivariate:</strong> To see the correlation between several numerical variables.</li>
+                            </ul>
+                        </li>
+                        <li><strong>Select Columns:</strong> Based on your choice, select the column(s) you want to analyze.</li>
+                        <li><strong>Select Color/Hue (Optional):</strong> You can select an additional column to color-code your plot. This is a powerful way to add a third dimension to your analysis (e.g., plot 'Age' vs. 'Income' colored by 'Gender').</li>
+                        <li>Click "Generate Plot". The interactive visualization will appear at the bottom of the page.</li>
+                    </ol>
+
+                    <hr class="my-4">
+
+                    <h4 class="mt-4">Phase 4: Feature Engineering</h4>
+                    <p>This step involves creating new features or modifying existing ones to improve the performance of machine learning models.</p>
+                    <ul>
+                        <li><strong>Create Feature:</strong> Create a new column from two existing numeric columns using a mathematical operation.</li>
+                        <li><strong>Encode Columns:</strong> Convert categorical (text) columns into numbers. Several methods are available depending on the nature of your data.</li>
+                        <li><strong>Scale Features:</strong> Standardize the range of your numerical columns so that they are all on a similar scale.</li>
+                        <li><strong>Rename/Drop Columns:</strong> Organize your dataset by renaming columns or removing ones you don't need.</li>
+                    </ul>
+
+                    <hr class="my-4">
+
+                    <h4 class="mt-4">Phase 5 & 6: Model Building & Evaluation</h4>
+                    <p>This is the core of the predictive pipeline. Here you will train machine learning models and see how well they perform.</p>
+                    <ol>
+                        <li><strong>Define Your Goal:</strong>
+                            <ul>
+                                <li>Select the **Problem Type** (Classification or Regression).</li>
+                                <li>Choose the **Target Variable** you want the model to predict.</li>
+                                <li>Set the **Test Set Size** (the percentage of data held back to test the model's performance).</li>
+                            </ul>
+                        </li>
+                        <li><strong>Select Your Tools:</strong>
+                            <ul>
+                                <li>Choose the **Feature Variables** the model should use to make its predictions.</li>
+                                <li>Select one or more **Models** to run. The application will train all the models you select.</li>
+                            </ul>
+                        </li>
+                        <li>Click "Build and Evaluate Models". You will be taken to a results page.</li>
+                        <li>On the results page, you will see a table comparing all the models. Below the table, you will find detailed plots for each model, including **Feature Importance** (which shows the most influential predictors) and a **Confusion Matrix** (for classification tasks).</li>
+                    </ol>
+
+                    <hr class="my-4">
+
+                    <h4 class="mt-4">Phase 7: Model Improvement (Tuning)</h4>
+                    <p>After building your models, you can try to improve the best one by tuning its settings (hyperparameters).</p>
+                    <ol>
+                        <li>On the Model Evaluation Results page, click the "Tune Model" button next to the model you want to improve.</li>
+                        <li>This will take you to the **Hyperparameter Tuning** page.</li>
+                        <li>The page provides a set of common hyperparameters for that model with default values to test.</li>
+                        <li>You can edit these values. Provide comma-separated numbers or text for the settings you want to try.</li>
+                        <li>Click "Run Tuning". The application will use GridSearchCV to find the best combination of settings.</li>
+                        <li>The results, including the best parameters and the performance of the tuned model, will be displayed on the page.</li>
+                    </ol>
+                </article>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

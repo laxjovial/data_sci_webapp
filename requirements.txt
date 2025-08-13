@@ -1,5 +1,11 @@
 Flask
 pandas
-plotly
+numpy
 scikit-learn
+plotly
 requests
+openpyxl
+gunicorn
+lightgbm
+catboost
+scikit-optimize

@@ -200,3 +200,62 @@ def correct_inconsistencies(df, column, mapping_dict):
     if column in df_cleaned.columns:
         df_cleaned[column] = df_cleaned[column].replace(mapping_dict)
     return df_cleaned
+
+def format_date_column(df, column, date_format=None):
+    """
+    Converts a column to datetime objects with an optional format string.
+
+    Technical: Uses pd.to_datetime to parse date strings. If a format string
+    is provided, it enforces that format during parsing. errors='coerce' will
+    turn unparseable values into NaT (Not a Time).
+
+    Layman: This tool correctly interprets a text column as dates. If your dates
+    are in a weird format, you can tell the app exactly how to read them.
+
+    Args:
+        df (pd.DataFrame): The input DataFrame.
+        column (str): The name of the column to format.
+        date_format (str, optional): The strftime format string. E.g., '%Y-%m-%d'.
+
+    Returns:
+        pd.DataFrame: The DataFrame with the formatted date column.
+        str: An error message if conversion fails.
+    """
+    df_cleaned = df.copy()
+    error_message = None
+    try:
+        df_cleaned[column] = pd.to_datetime(df_cleaned[column], format=date_format, errors='coerce')
+    except Exception as e:
+        error_message = f"Error formatting date column '{column}': {e}"
+
+    return df_cleaned, error_message
+
+def sort_dataframe(df, columns, ascending_list):
+    """
+    Sorts the DataFrame by specified columns and orders.
+    """
+    df_cleaned = df.copy()
+    try:
+        df_cleaned = df_cleaned.sort_values(by=columns, ascending=ascending_list)
+    except Exception as e:
+        return df, f"Error sorting data: {e}"
+    return df_cleaned, None
+
+def reset_dataframe_index(df):
+    """
+    Resets the DataFrame index.
+    """
+    df_cleaned = df.copy()
+    df_cleaned = df_cleaned.reset_index(drop=True)
+    return df_cleaned, None
+
+def drop_columns(df, columns):
+    """
+    Drops specified columns from the DataFrame.
+    """
+    df_cleaned = df.copy()
+    try:
+        df_cleaned = df_cleaned.drop(columns=columns)
+    except Exception as e:
+        return df, f"Error dropping columns: {e}"
+    return df_cleaned, None

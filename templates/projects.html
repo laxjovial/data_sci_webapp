@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-dark text-white">
+                <h4>Load & Manage Projects</h4>
+                <p class="mb-0">Resume a previous session or manage your saved projects.</p>
+            </div>
+            <div class="card-body">
+                {% if error %}
+                <div class="alert alert-danger" role="alert"><strong>Error:</strong> {{ error }}</div>
+                {% endif %}
+                {% if success %}
+                <div class="alert alert-success" role="alert"><strong>Success:</strong> {{ success }}</div>
+                {% endif %}
+
+                <!-- Load Project Form -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title">Load Project by ID</h5>
+                        <form action="{{ url_for('projects') }}" method="post">
+                            <input type="hidden" name="action" value="load_project">
+                            <div class="input-group">
+                                <input type="text" class="form-control" name="project_id" placeholder="Enter Project ID..." required>
+                                <button class="btn btn-primary" type="submit">Load Project</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Saved Projects List -->
+                <h5 class="mb-3">Saved Projects</h5>
+                {% if projects %}
+                    <ul class="list-group">
+                        {% for project_id in projects %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>
+                                <i class="fas fa-folder me-2"></i>{{ project_id }}
+                            </span>
+                            <div>
+                                <!-- Load Form -->
+                                <form action="{{ url_for('projects') }}" method="post" style="display: inline;">
+                                    <input type="hidden" name="action" value="load_project">
+                                    <input type="hidden" name="project_id" value="{{ project_id }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-primary me-2">Load</button>
+                                </form>
+                                <!-- Delete Form -->
+                                <form action="{{ url_for('projects') }}" method="post" style="display: inline;" onsubmit="return confirm('Are you sure you want to permanently delete this project?');">
+                                    <input type="hidden" name="action" value="delete_project">
+                                    <input type="hidden" name="project_id" value="{{ project_id }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                </form>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <div class="alert alert-secondary">No saved projects found.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Font Awesome for icons -->
+<script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+{% endblock %}
