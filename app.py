@@ -2,25 +2,21 @@
 
 import os
 import uuid
-
 from flask import Flask, render_template, request, redirect, url_for, session, send_file
-
 from werkzeug.utils import secure_filename
 from utils.data_ingestion import load_data, get_dataframe_summary
 from utils.data_cleaning import (
     handle_missing_values, rename_column, convert_dtype,
-
     remove_duplicates, standardize_text, handle_outliers, correct_inconsistencies,
-    format_date_column
-
+    format_date_column, sort_dataframe, reset_dataframe_index, drop_columns
 )
 from utils.data_engineering import (
     create_new_feature, apply_encoding, scale_features, rename_and_drop_columns
 )
+from utils.data_filtering import filter_dataframe
+from utils.data_aggregation import group_by_aggregate, pivot_table
 from utils.eda import generate_univariate_plot, generate_bivariate_plot, generate_multivariate_plot
-
 from utils.data_export import export_dataframe, export_ipynb
-
 import pandas as pd
 import numpy as np
 import io
@@ -112,9 +108,7 @@ def index():
                 filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
                 session['filepath'] = filepath
                 session['file_ext'] = file_ext
-
                 session['code_log'] = [f"df = pd.read_csv('{filepath}')" if file_ext == '.csv' else f"df = pd.read_excel('{filepath}')"]
-
                 _save_df_to_filepath(df)
                 return redirect(url_for('data_viewer'))
 
@@ -167,9 +161,7 @@ def data_cleaning():
 
             elif action == 'remove_duplicates':
                 df = remove_duplicates(df)
-
                 session['code_log'].append(f"df = df.drop_duplicates()")
-
                 success_message = "Duplicate rows removed."
             
             elif action == 'standardize_text':
@@ -177,9 +169,7 @@ def data_cleaning():
                 case = request.form.get('text_case')
                 df, new_error_message = standardize_text(df, column, case)
                 if new_error_message is None:
-
                     session['code_log'].append(f"df['{column}'] = df['{column}'].str.{case}()")
-
                     success_message = f"Text in '{column}' standardized to '{case}'."
 
             elif action == 'handle_outliers':
@@ -187,9 +177,7 @@ def data_cleaning():
                 method = request.form.get('outlier_method')
                 df, new_error_message = handle_outliers(df, column, method)
                 if new_error_message is None:
-
                     session['code_log'].append(f"# Handling outliers in '{column}' using {method} method (code is complex)")
-
                     success_message = f"Outliers in '{column}' handled using '{method}'."
 
             elif action == 'correct_inconsistencies':
@@ -200,7 +188,6 @@ def data_cleaning():
                     raise ValueError("Input is not a valid dictionary.")
                 df, new_error_message = correct_inconsistencies(df, column, mapping_dict)
                 if new_error_message is None:
-
                     session['code_log'].append(f"df['{column}'] = df['{column}'].replace({mapping_dict})")
                     success_message = f"Inconsistencies in '{column}' corrected."
 
@@ -212,12 +199,35 @@ def data_cleaning():
                     session['code_log'].append(f"df['{column}'] = pd.to_datetime(df['{column}'], format='{date_format}', errors='coerce')")
                     success_message = f"Date column '{column}' formatted successfully."
 
+            elif action == 'sort_data':
+                columns = request.form.getlist('sort_cols')
+                # The form sends 'True' or 'False' as strings
+                ascending = request.form.get('sort_order') == 'True'
+                # Create a list of booleans of the same length as columns
+                ascending_list = [ascending] * len(columns)
+                df, new_error_message = sort_dataframe(df, columns, ascending_list)
+                if new_error_message is None:
+                    session['code_log'].append(f"df = df.sort_values(by={columns}, ascending={ascending})")
+                    success_message = f"Data sorted by {columns}."
+
+            elif action == 'drop_columns':
+                columns = request.form.getlist('drop_cols')
+                df, new_error_message = drop_columns(df, columns)
+                if new_error_message is None:
+                    session['code_log'].append(f"df = df.drop(columns={columns})")
+                    success_message = f"Columns {columns} dropped."
+
+            elif action == 'reset_index':
+                df, new_error_message = reset_dataframe_index(df)
+                if new_error_message is None:
+                    session['code_log'].append("df = df.reset_index(drop=True)")
+                    success_message = "DataFrame index has been reset."
+
             if new_error_message is None:
                 _save_df_to_filepath(df)
 
         except Exception as e:
             new_error_message = f"An error occurred: {e}"
-
 
     df_head_html, _, _, columns, _ = get_dataframe_summary(df)
     current_stage, progress_percent = _get_progress_data("Data Cleaning")
@@ -275,6 +285,45 @@ def data_eda():
                            progress_percent=progress_percent)
 
 
+@app.route('/data_filtering', methods=['GET', 'POST'])
+def data_filtering():
+    df, error_message = _get_df_from_filepath()
+    if error_message:
+        return redirect(url_for('index'))
+
+    new_error_message = None
+    success_message = None
+
+    if request.method == 'POST':
+        try:
+            column = request.form.get('filter_col')
+            operator = request.form.get('filter_op')
+            value = request.form.get('filter_val')
+
+            original_rows = len(df)
+            df, new_error_message = filter_dataframe(df, column, operator, value)
+            if new_error_message is None:
+                _save_df_to_filepath(df)
+                filtered_rows = len(df)
+                success_message = f"Filter applied successfully. Showing {filtered_rows} of {original_rows} rows."
+                session['code_log'].append(f"df = df[df['{column}'] {operator} '{value}'] # Adjust value quoting for strings vs. numbers")
+        except Exception as e:
+            new_error_message = f"An error occurred during filtering: {e}"
+
+    df_head_html = df.head(100).to_html(classes=['table', 'table-striped', 'table-sm'])
+    _, _, columns, _ = get_dataframe_summary(df)
+
+    # This page doesn't neatly fit in the linear pipeline, so we can handle progress differently
+    # For now, let's just pass dummy values or handle it gracefully in the template
+    current_stage = "Data Filtering"
+    progress_percent = 50
+
+    return render_template('data_filtering.html',
+                           df_head=df_head_html, columns=columns,
+                           error=new_error_message, success=success_message,
+                           current_stage=current_stage, progress_percent=progress_percent)
+
+
 @app.route('/data_engineering', methods=['GET', 'POST'])
 def data_engineering():
     df, error_message = _get_df_from_filepath()
@@ -295,10 +344,8 @@ def data_engineering():
                 new_col_name = request.form.get('new_col_name')
                 df, new_error_message = create_new_feature(df, col1, col2, operation, new_col_name)
                 if new_error_message is None:
-
                     op_map = {'add': '+', 'subtract': '-', 'multiply': '*', 'divide': '/'}
                     session['code_log'].append(f"df['{new_col_name}'] = df['{col1}'] {op_map[operation]} df['{col2}']")
-
                     success_message = f"New feature '{new_col_name}' created."
 
             elif action == 'apply_encoding':
@@ -306,9 +353,7 @@ def data_engineering():
                 encoding_type = request.form.get('encoding_type')
                 df, new_error_message = apply_encoding(df, columns, encoding_type)
                 if new_error_message is None:
-
                     session['code_log'].append(f"# Applying {encoding_type} encoding to {columns} (code is complex)")
-
                     success_message = f"Columns encoded using '{encoding_type}'."
 
             elif action == 'scale_features':
@@ -316,9 +361,7 @@ def data_engineering():
                 scaler_type = request.form.get('scaler_type')
                 df, new_error_message = scale_features(df, columns, scaler_type)
                 if new_error_message is None:
-
                     session['code_log'].append(f"# Scaling {columns} using {scaler_type} scaler (code is complex)")
-
                     success_message = f"Columns scaled using '{scaler_type}'."
 
             elif action == 'rename_drop':
@@ -340,8 +383,58 @@ def data_engineering():
     return render_template('data_engineering.html',
                            df_head=df_head_html, columns=columns, error=new_error_message,
                            success=success_message, current_stage=current_stage,
-
                            progress_percent=progress_percent)
+
+
+@app.route('/data_aggregation', methods=['GET', 'POST'])
+def data_aggregation():
+    df, error_message = _get_df_from_filepath()
+    if error_message:
+        return redirect(url_for('index'))
+
+    new_error_message = None
+    success_message = None
+    result_df_head = None
+
+    if request.method == 'POST':
+        try:
+            agg_type = request.form.get('agg_type')
+            result_df = None
+
+            if agg_type == 'groupby':
+                groupby_cols = request.form.getlist('groupby_cols')
+                agg_col = request.form.get('agg_col')
+                agg_func = request.form.get('agg_func')
+                result_df, new_error_message = group_by_aggregate(df, groupby_cols, agg_col, agg_func)
+                if new_error_message is None:
+                    success_message = "GroupBy aggregation successful."
+                    session['code_log'].append(f"agg_df = df.groupby({groupby_cols})['{agg_col}'].agg('{agg_func}').reset_index()")
+
+            elif agg_type == 'pivot':
+                index_cols = request.form.getlist('pivot_index')
+                column_cols = request.form.getlist('pivot_cols')
+                value_col = request.form.get('pivot_val')
+                agg_func = request.form.get('pivot_agg')
+                result_df, new_error_message = pivot_table(df, index_cols, column_cols, value_col, agg_func)
+                if new_error_message is None:
+                    success_message = "Pivot table created successfully."
+                    session['code_log'].append(f"pivot_df = df.pivot_table(values='{value_col}', index={index_cols}, columns={column_cols}, aggfunc='{agg_func}')")
+
+            if result_df is not None:
+                # Don't save the aggregated df, just show it
+                result_df_head = result_df.head(100).to_html(classes=['table', 'table-striped', 'table-sm'])
+
+        except Exception as e:
+            new_error_message = f"An error occurred: {e}"
+
+    _, _, columns, _ = get_dataframe_summary(df)
+    current_stage = "Data Aggregation"
+    progress_percent = 60
+
+    return render_template('data_aggregation.html',
+                           columns=columns, df=df, result_df_head=result_df_head,
+                           error=new_error_message, success=success_message,
+                           current_stage=current_stage, progress_percent=progress_percent)
 
 
 @app.route('/user_guide')
@@ -387,16 +480,7 @@ def export():
     return render_template('export.html',
                            df_head=df_head_html,
                            current_stage=current_stage,
-
                            progress_percent=progress_percent)
-
-
-@app.route('/user_guide')
-def user_guide():
-    """
-    Renders the user guide page.
-    """
-    return render_template('user_guide.html')
 
 
 if __name__ == '__main__':
