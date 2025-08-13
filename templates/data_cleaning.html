@@ -38,6 +38,9 @@
                     <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#pills-text" type="button">Standardize Text</button></li>
                     <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#pills-outliers" type="button">Handle Outliers</button></li>
                     <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#pills-inconsistencies" type="button">Correct Inconsistencies</button></li>
+
+                    <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#pills-dates" type="button">Format Dates</button></li>
+
                 </ul>
 
                 <div class="tab-content border p-3" id="pills-tabContent">
@@ -74,6 +77,7 @@
                                 <label for="dtype_col" class="form-label">Column to Convert:</label>
                                 <select class="form-select" name="dtype_col">
                                     {% for col in columns %}<option value="{{ col }}">{{ col }}</option>{% endfor %}
+
                                 </select>
                             </div>
                             <div class="mb-3">
@@ -116,11 +120,13 @@
                                     <option value="lower">Lowercase</option>
                                     <option value="upper">Uppercase</option>
                                     <option value="title">Title Case</option>
+
                                 </select>
                             </div>
                             <button type="submit" class="btn btn-success">Apply</button>
                         </form>
                     </div>
+
 
                     <!-- Handle Outliers -->
                     <div class="tab-pane fade" id="pills-outliers" role="tabpanel">
@@ -138,11 +144,13 @@
                                 <select class="form-select" name="outlier_method">
                                     <option value="remove">Remove Outlier Rows (using IQR)</option>
                                     <option value="cap">Cap Outliers (replace with boundary values)</option>
+
                                 </select>
                             </div>
                             <button type="submit" class="btn btn-success">Apply</button>
                         </form>
                     </div>
+
 
                     <!-- Correct Inconsistencies -->
                     <div class="tab-pane fade" id="pills-inconsistencies" role="tabpanel">
@@ -159,6 +167,31 @@
                                 <label for="mapping_dict" class="form-label">Mapping Dictionary:</label>
                                 <input type="text" class="form-control" name="mapping_dict" placeholder="{'old_val': 'new_val', 'typo': 'correct'}">
                                 <div class="form-text">Enter a Python dictionary. Example: <code>{'N/A': 'Unknown', 'us': 'USA'}</code></div>
+
+                            </div>
+                            <button type="submit" class="btn btn-success">Apply</button>
+                        </form>
+                    </div>
+
+
+                    <!-- Format Dates -->
+                    <div class="tab-pane fade" id="pills-dates" role="tabpanel">
+                        <form action="{{ url_for('data_cleaning') }}" method="post">
+                            <input type="hidden" name="action" value="format_dates">
+                            <p class="form-text">Convert a column to a proper date type. If your dates are in a non-standard format, provide a format code.</p>
+                            <div class="mb-3">
+                                <label for="date_col" class="form-label">Column to Format as Date:</label>
+                                <select class="form-select" name="date_col">
+
+                                    {% for col in columns %}<option value="{{ col }}">{{ col }}</option>{% endfor %}
+                                </select>
+                            </div>
+                            <div class="mb-3">
+
+                                <label for="date_format" class="form-label">Date Format Code (Optional):</label>
+                                <input type="text" class="form-control" name="date_format" placeholder="%Y-%m-%d %H:%M:%S">
+                                <div class="form-text">Example: for '2023-01-15', use <code>%Y-%m-%d</code>. Leave blank to let the app guess.</div>
+
                             </div>
                             <button type="submit" class="btn btn-success">Apply</button>
                         </form>
