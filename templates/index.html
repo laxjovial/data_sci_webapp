@@ -1,68 +1,39 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-10 text-center">
-        <h1 class="display-4 fw-bold">Welcome to the Data Science Pipeline</h1>
-        <p class="lead">Start by ingesting your data from a local file or a web URL to begin the pipeline.</p>
-    </div>
-</div>
-
-<div class="row mt-5">
-    <div class="col-md-6 mb-4">
+<div class="row">
+    <div class="col-md-6">
         <div class="card">
             <div class="card-header">
-                Upload a Local File
+                <h3>Upload a Dataset</h3>
             </div>
             <div class="card-body">
-                <form action="{{ url_for('upload_file') }}" method="POST" enctype="multipart/form-data">
+                <form action="{{ url_for('upload_file') }}" method="post" enctype="multipart/form-data">
                     <div class="mb-3">
-                        <label for="file_upload" class="form-label">Select a file (CSV, Excel, or JSON)</label>
+                        <label for="file_upload" class="form-label">Choose a CSV or Excel file</label>
                         <input class="form-control" type="file" id="file_upload" name="file_upload" required>
                     </div>
-                    <button type="submit" class="btn btn-primary">Upload File</button>
+                    <button type="submit" class="btn btn-primary">Upload</button>
                 </form>
             </div>
         </div>
     </div>
-
-    <div class="col-md-6 mb-4">
+    <div class="col-md-6">
         <div class="card">
             <div class="card-header">
-                Ingest from a URL
+                <h3>Ingest from URL</h3>
             </div>
             <div class="card-body">
-                <form action="{{ url_for('ingest_url') }}" method="POST">
+                <form action="{{ url_for('ingest_url') }}" method="post">
                     <div class="mb-3">
-                        <label for="url_input" class="form-label">Enter a URL to a CSV, Excel, or JSON file</label>
-                        <input type="url" class="form-control" id="url_input" name="url" placeholder="e.g., https://raw.githubusercontent.com/user/repo/file.csv" required>
+                        <label for="url" class="form-label">Enter a data URL (CSV, Excel)</label>
+                        <input type="url" class="form-control" id="url" name="url" placeholder="e.g., https://example.com/data.csv" required>
                     </div>
-                    <button type="submit" class="btn btn-primary">Ingest Data</button>
+                    <button type="submit" class="btn btn-primary">Ingest</button>
                 </form>
             </div>
         </div>
     </div>
 </div>
-
-<div class="row mt-4">
-    <div class="col-md-12">
-        <div class="card">
-            <div class="card-header">
-                Ingested Data Preview
-            </div>
-            <div class="card-body">
-                {% if error %}
-                    <div class="alert alert-danger">{{ error }}</div>
-                {% endif %}
-                {% if data_viewer %}
-                    <div class="table-responsive">
-                        {{ data_viewer|safe }}
-                    </div>
-                {% else %}
-                    <p>No data ingested yet. Please upload a file or provide a URL to see a preview of your data here.</p>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-</div>
+{% include 'data_viewer.html' %}
 {% endblock %}
