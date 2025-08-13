@@ -11,7 +11,7 @@ import plotly.graph_objs as go
 import plotly.express as px
 
 # Import your corrected Python modules
-from utils.data_ingestion import load_data, get_dataframe_summary
+from utils.data_ingestion import load_data
 from utils.data_cleaning import handle_missing_values, rename_column, convert_dtype, remove_duplicates, standardize_text
 from utils.data_aggregation import group_by_aggregate
 from utils.data_filtering import filter_dataframe
@@ -72,7 +72,7 @@ def upload_file():
         filename = secure_filename(file.filename)
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(filepath)
-        df, error = ingest_data(source_type='file', source_path_or_file=filepath)
+        df, error = load_data(source_type='upload', source_path_or_file=filepath)
         if error:
             flash(error, 'danger')
             return redirect(url_for('index'))
@@ -86,7 +86,7 @@ def ingest_url():
     if not url:
         flash('No URL provided', 'danger')
         return redirect(url_for('index'))
-    df, error = ingest_data(source_type='url', source_path_or_file=url)
+    df, error = load_data(source_type='url', source_path_or_file=url)
     if error:
         flash(error, 'danger')
         return redirect(url_for('index'))
