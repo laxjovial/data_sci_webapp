@@ -2,8 +2,10 @@
 
 import os
 import uuid
+
 import json
 import shutil
+
 from flask import Flask, render_template, request, redirect, url_for, session, send_file
 from werkzeug.utils import secure_filename
 from utils.data_ingestion import load_data, get_dataframe_summary
@@ -17,8 +19,10 @@ from utils.data_engineering import (
 )
 from utils.data_filtering import filter_dataframe
 from utils.data_aggregation import group_by_aggregate, pivot_table
+
 from utils.data_combining import combine_dataframes
 from utils.modeling import get_model_list, run_models, get_hyperparameter_grid, tune_model_hyperparameters
+
 from utils.eda import generate_univariate_plot, generate_bivariate_plot, generate_multivariate_plot
 from utils.data_export import export_dataframe, export_ipynb
 import pandas as pd
@@ -37,6 +41,7 @@ PIPELINE_STAGES = [
     "Data Ingestion", "Data Cleaning", "EDA & Visualization",
     "Feature Engineering", "Model Building", "Model Evaluation", "Export & Finalization"
 ]
+
 
 def _get_project_dir():
     if 'project_id' in session:
@@ -106,6 +111,7 @@ def _get_progress_data(current_stage_name):
 def index():
     error_message = None
     if request.method == 'POST':
+
         # This route now only handles creating new projects
         action = request.form.get('action')
         if action != 'create_project':
@@ -179,6 +185,7 @@ def projects():
                     with open(state_path, 'r') as f:
                         state = json.load(f)
 
+
                     session.clear()
                     for key, value in state.items():
                         session[key] = value
@@ -202,9 +209,11 @@ def projects():
     return render_template('projects.html', projects=project_list, error=error_message, success=success_message)
 
 
+
 @app.route('/data_viewer')
 def data_viewer():
     df, error_message = _get_df_from_project()
+
     if error_message:
         return redirect(url_for('index'))
 
@@ -218,7 +227,9 @@ def data_viewer():
 
 @app.route('/data_cleaning', methods=['GET', 'POST'])
 def data_cleaning():
+
     df, error_message = _get_df_from_project()
+
     if error_message:
         return redirect(url_for('index'))
 
@@ -307,11 +318,13 @@ def data_cleaning():
                     success_message = "DataFrame index has been reset."
 
             if new_error_message is None:
+
                 _save_df_to_project(df)
                 _save_project_state()
 
         except Exception as e:
             new_error_message = f"An error occurred: {e}"
+
 
     df_head_html, _, _, columns, _ = get_dataframe_summary(df)
     current_stage, progress_percent = _get_progress_data("Data Cleaning")
@@ -323,7 +336,9 @@ def data_cleaning():
 
 @app.route('/data_eda', methods=['GET', 'POST'])
 def data_eda():
+
     df, error_message = _get_df_from_project()
+
     if error_message:
         return redirect(url_for('index'))
 
@@ -334,12 +349,16 @@ def data_eda():
     if request.method == 'POST':
         try:
             analysis_type = request.form.get('analysis_type')
+
             color_col = request.form.get('color_col') or None # Use None if empty
+
 
             if analysis_type == 'univariate':
                 column = request.form.get('uni_column')
                 if column:
+
                     plot_json = generate_univariate_plot(df, column, color=color_col)
+
                 else:
                     new_error_message = "Please select a column for univariate analysis."
 
@@ -347,14 +366,18 @@ def data_eda():
                 x_col = request.form.get('bi_x_column')
                 y_col = request.form.get('bi_y_column')
                 if x_col and y_col:
+
                     plot_json = generate_bivariate_plot(df, x_col, y_col, color=color_col)
+
                 else:
                     new_error_message = "Please select two columns for bivariate analysis."
 
             elif analysis_type == 'multivariate':
                 multi_columns = request.form.getlist('multi_columns')
                 if len(multi_columns) > 1:
+
                     plot_json = generate_multivariate_plot(df, multi_columns, color=color_col)
+
                 else:
                     new_error_message = "Please select at least two columns for multivariate analysis."
 
@@ -372,7 +395,9 @@ def data_eda():
 
 @app.route('/data_filtering', methods=['GET', 'POST'])
 def data_filtering():
+
     df, error_message = _get_df_from_project()
+
     if error_message:
         return redirect(url_for('index'))
 
@@ -388,11 +413,13 @@ def data_filtering():
             original_rows = len(df)
             df, new_error_message = filter_dataframe(df, column, operator, value)
             if new_error_message is None:
+
                 _save_df_to_project(df)
                 filtered_rows = len(df)
                 success_message = f"Filter applied successfully. Showing {filtered_rows} of {original_rows} rows."
                 session['code_log'].append(f"df = df[df['{column}'] {operator} '{value}'] # Adjust value quoting for strings vs. numbers")
                 _save_project_state()
+
         except Exception as e:
             new_error_message = f"An error occurred during filtering: {e}"
 
@@ -412,7 +439,9 @@ def data_filtering():
 
 @app.route('/data_engineering', methods=['GET', 'POST'])
 def data_engineering():
+
     df, error_message = _get_df_from_project()
+
     if error_message:
         return redirect(url_for('index'))
 
@@ -459,11 +488,13 @@ def data_engineering():
                     success_message = "Columns renamed/dropped."
 
             if new_error_message is None:
+
                 _save_df_to_project(df)
                 _save_project_state()
 
         except Exception as e:
             new_error_message = f"An error occurred: {e}"
+
 
     df_head_html, _, _, columns, _ = get_dataframe_summary(df)
     current_stage, progress_percent = _get_progress_data("Feature Engineering")
@@ -475,7 +506,9 @@ def data_engineering():
 
 @app.route('/data_aggregation', methods=['GET', 'POST'])
 def data_aggregation():
+
     df, error_message = _get_df_from_project()
+
     if error_message:
         return redirect(url_for('index'))
 
@@ -524,9 +557,11 @@ def data_aggregation():
                            current_stage=current_stage, progress_percent=progress_percent)
 
 
+
 @app.route('/data_combining', methods=['GET', 'POST'])
 def data_combining():
     left_df, error_message = _get_df_from_project()
+
     if error_message:
         return redirect(url_for('index'))
 
@@ -572,7 +607,9 @@ def data_combining():
 
                     if new_error_message is None:
                         # Overwrite the main df with the result
+
                         _save_df_to_project(combined_df)
+
                         result_df_head = combined_df.head().to_html(classes=['table', 'table-striped', 'table-sm'])
                         success_message = f"DataFrames combined successfully using '{method}'."
                         # Clean up the right dataframe from session and disk
@@ -599,9 +636,11 @@ def data_combining():
                            current_stage="Data Combining", progress_percent=30)
 
 
+
 @app.route('/model_building', methods=['GET', 'POST'])
 def model_building():
     df, error_message = _get_df_from_project()
+
     if error_message:
         return redirect(url_for('index'))
 
@@ -626,10 +665,12 @@ def model_building():
             results_table = results_df.drop(columns=['Confusion Matrix'], errors='ignore').to_html(classes=['table', 'table-striped', 'table-sm'])
             results_list = results_df.to_dict(orient='records')
 
+
             # Save the run configuration for the tuning step
             session['last_run_features'] = feature_cols
             session['last_run_target'] = target_col
             session['last_run_problem_type'] = problem_type
+
 
             return render_template('model_results.html',
                                    results_table=results_table,
@@ -657,9 +698,11 @@ def model_building():
                            progress_percent=progress_percent)
 
 
+
 @app.route('/model_tuning/<model_name>', methods=['GET', 'POST'])
 def model_tuning(model_name):
     df, error_message = _get_df_from_project()
+
     if error_message:
         return redirect(url_for('index'))
 
@@ -714,6 +757,7 @@ def model_tuning(model_name):
                            progress_percent=95)
 
 
+
 @app.route('/user_guide')
 def user_guide():
     """
@@ -724,7 +768,9 @@ def user_guide():
 
 @app.route('/export', methods=['GET', 'POST'])
 def export():
+
     df, error_message = _get_df_from_project()
+
     if error_message:
         return redirect(url_for('index'))
 
