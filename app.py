@@ -26,25 +26,40 @@ from utils.data_combining import combine_dataframes
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'  # Change this to a secure, random key in production
 app.config['UPLOAD_FOLDER'] = 'uploads/'
+# New configuration for storing DataFrames on the server
+app.config['DATA_FOLDER'] = 'data/'
 
-# Ensure the upload folder exists
+# Ensure the upload and data folders exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+os.makedirs(app.config['DATA_FOLDER'], exist_ok=True)
 
-def load_df_from_session():
-    """Helper function to load the DataFrame from the session."""
-    if 'current_df' in session:
+def load_df_from_session(key='current_df'):
+    """Helper function to load a DataFrame from a file path stored in the session."""
+    if key in session and session[key]:
+        filepath = session[key]
         try:
-            df_json = json.loads(session['current_df'])
-            df = pd.DataFrame(df_json)
+            # Use a more efficient format like Parquet
+            df = pd.read_parquet(filepath)
             return df
         except Exception as e:
-            flash(f"Error loading DataFrame from session: {e}", "danger")
+            flash(f"Error loading DataFrame from file: {e}", "danger")
             return None
     return None
 
-def save_df_to_session(df):
-    """Helper function to save the DataFrame to the session."""
-    session['current_df'] = df.to_json(orient='split')
+def save_df_to_session(df, key='current_df'):
+    """Helper function to save a DataFrame to a file and store the path in the session."""
+    if df is not None:
+        # Generate a unique filename and save the DataFrame to disk
+        filename = f"{uuid.uuid4()}.parquet"
+        filepath = os.path.join(app.config['DATA_FOLDER'], filename)
+        df.to_parquet(filepath)
+        
+        # Clean up the old file if it exists
+        if key in session and session[key] and os.path.exists(session[key]):
+            os.remove(session[key])
+            
+        # Store only the file path in the session
+        session[key] = filepath
 
 def generate_df_viewer(df, num_rows=5):
     """Helper function to generate an HTML table for viewing a DataFrame."""
@@ -277,12 +292,15 @@ def data_filtering():
 
 @app.route('/data_combining', methods=['GET', 'POST'])
 def data_combining():
+    # Load multiple dataframes using the new method
+    df_paths = session.get('dataframes', {})
+    
     # Placeholder for multiple dataframes
     if 'dataframes' not in session:
         session['dataframes'] = {}
 
     df_names = list(session['dataframes'].keys())
-    combined_df = None
+    combined_df_viewer = None
     error = None
 
     if request.method == 'POST':
@@ -290,14 +308,14 @@ def data_combining():
         right_df_name = request.form.get('right_df')
         method = request.form.get('method')
         
-        left_df_json = session['dataframes'].get(left_df_name)
-        right_df_json = session['dataframes'].get(right_df_name)
-
-        if not left_df_json or not right_df_json:
+        left_df_path = df_paths.get(left_df_name)
+        right_df_path = df_paths.get(right_df_name)
+        
+        if not left_df_path or not right_df_path:
             error = "Both DataFrames must be selected."
         else:
-            left_df = pd.DataFrame(json.loads(left_df_json))
-            right_df = pd.DataFrame(json.loads(right_df_json))
+            left_df = pd.read_parquet(left_df_path)
+            right_df = pd.read_parquet(right_df_path)
             
             kwargs = {}
             if method == 'merge':
@@ -312,22 +330,24 @@ def data_combining():
                 error = combine_error
             else:
                 new_df_name = f"{left_df_name}_{right_df_name}_combined"
-                session['dataframes'][new_df_name] = result_df.to_json(orient='split')
+                # Save the new DataFrame and store its path
+                filename = f"{uuid.uuid4()}.parquet"
+                filepath = os.path.join(app.config['DATA_FOLDER'], filename)
+                result_df.to_parquet(filepath)
+                
+                session['dataframes'][new_df_name] = filepath
                 save_df_to_session(result_df)
-                combined_df = generate_df_viewer(result_df, num_rows=10)
+                combined_df_viewer = generate_df_viewer(result_df, num_rows=10)
                 flash(f"DataFrames combined successfully! New DataFrame '{new_df_name}' created.", 'success')
                 return redirect(url_for('data_combining'))
 
     # Update columns for the merge_on dropdown
     columns = []
-    if 'current_df' in session:
-        try:
-            current_df = pd.DataFrame(json.loads(session['current_df']))
-            columns = current_df.columns.tolist()
-        except:
-            pass
+    current_df = load_df_from_session()
+    if current_df is not None:
+        columns = current_df.columns.tolist()
 
-    return render_template('data_combining.html', dataframes=df_names, combined_df=combined_df, error=error, columns=columns)
+    return render_template('data_combining.html', dataframes=df_names, combined_df=combined_df_viewer, error=error, columns=columns)
 
 @app.route('/model_building', methods=['GET', 'POST'])
 def model_building():
