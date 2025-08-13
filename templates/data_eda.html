@@ -106,6 +106,20 @@
                         </div>
                     </div>
 
+
+                    <hr>
+                    <div class="mb-3">
+                        <label for="color_col" class="form-label fw-bold">2. Select Color/Hue Column (Optional)</label>
+                        <select class="form-select" name="color_col" id="color_col">
+                            <option value="">-- None --</option>
+                            {% for column in columns %}
+                            <option value="{{ column }}">{{ column }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">Color-code your plot by the categories in this column.</div>
+                    </div>
+
+
                     <button type="submit" class="btn btn-success w-100 mt-3">Generate Plot</button>
                 </form>
 

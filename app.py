@@ -112,67 +112,53 @@ def index():
     error_message = None
     if request.method == 'POST':
 
+        # This route now only handles creating new projects
         action = request.form.get('action')
-        
+        if action != 'create_project':
+            return redirect(url_for('index'))
+
         try:
-            if action == 'load_project':
-                project_id = request.form.get('project_id')
-                project_dir = os.path.join(app.config['UPLOAD_FOLDER'], project_id)
-                state_path = os.path.join(project_dir, 'project_state.json')
-                if not os.path.exists(state_path):
-                    raise ValueError("Project ID not found.")
-
-                with open(state_path, 'r') as f:
-                    state = json.load(f)
-
-                # Load state into session
-                for key, value in state.items():
-                    session[key] = value
-
-                return redirect(url_for('data_viewer'))
-
-            elif action == 'create_project':
-                source_type = request.form.get('source_type')
-                df = None
-                if source_type == 'url':
-                    url = request.form.get('url')
-                    df, error_message = load_data(source_type='url', source_path_or_file=url)
-                    if df is not None:
-                        file_ext = '.csv' if '.csv' in url else '.xlsx'
-                elif source_type == 'upload':
-                    file = request.files.get('file')
-                    if file and file.filename:
-                        _, file_ext = os.path.splitext(file.filename)
-                        if file_ext.lower() not in ['.csv', '.xls', '.xlsx']:
-                            raise ValueError("Unsupported file type.")
-                        df, error_message = load_data(source_type='upload', source_path_or_file=file)
-                    else:
-                        raise ValueError("No file selected.")
-
+            source_type = request.form.get('source_type')
+            df = None
+            if source_type == 'url':
+                url = request.form.get('url')
+                df, error_message = load_data(source_type='url', source_path_or_file=url)
                 if df is not None:
-                    project_id = f"project_{uuid.uuid4().hex[:12]}"
-                    project_dir = os.path.join(app.config['UPLOAD_FOLDER'], project_id)
-                    os.makedirs(project_dir, exist_ok=True)
+                    file_ext = '.csv' if '.csv' in url else '.xlsx'
+            elif source_type == 'upload':
+                file = request.files.get('file')
+                if file and file.filename:
+                    _, file_ext = os.path.splitext(file.filename)
+                    if file_ext.lower() not in ['.csv', '.xls', '.xlsx']:
+                        raise ValueError("Unsupported file type.")
+                    df, error_message = load_data(source_type='upload', source_path_or_file=file)
+                else:
+                    raise ValueError("No file selected.")
 
-                    data_filename = f"data{file_ext}"
-                    data_path = os.path.join(project_dir, data_filename)
+            if df is not None:
+                project_id = f"project_{uuid.uuid4().hex[:12]}"
+                project_dir = os.path.join(app.config['UPLOAD_FOLDER'], project_id)
+                os.makedirs(project_dir, exist_ok=True)
 
-                    session['project_id'] = project_id
-                    session['data_filename'] = data_filename
-                    session['code_log'] = [f"df = pd.read_csv('data.csv')"] if file_ext == '.csv' else [f"df = pd.read_excel('data.xlsx')"]
+                data_filename = f"data{file_ext}"
+                data_path = os.path.join(project_dir, data_filename)
 
-                    if file_ext == '.csv':
-                        df.to_csv(data_path, index=False)
-                    else:
-                        df.to_excel(data_path, index=False)
+                # Clear previous session data and set up new project
+                session.clear()
+                session['project_id'] = project_id
+                session['data_filename'] = data_filename
+                session['code_log'] = [f"df = pd.read_csv('data.csv')"] if file_ext == '.csv' else [f"df = pd.read_excel('data.xlsx')"]
 
-                    _save_project_state()
-                    return redirect(url_for('data_viewer'))
+                if file_ext == '.csv':
+                    df.to_csv(data_path, index=False)
+                else:
+                    df.to_excel(data_path, index=False)
 
+                _save_project_state()
+                return redirect(url_for('data_viewer'))
 
         except Exception as e:
             error_message = str(e)
-
 
     return render_template('index.html', error=error_message)
 
@@ -184,45 +170,48 @@ def projects():
     if request.method == 'POST':
         action = request.form.get('action')
         project_id = request.form.get('project_id')
-        project_dir = os.path.join(app.config['UPLOAD_FOLDER'], project_id)
+        
+        if not project_id or not project_id.startswith('project_'):
+            error_message = "Invalid Project ID format."
+        else:
+            project_dir = os.path.join(app.config['UPLOAD_FOLDER'], project_id)
 
-        if action == 'load_project':
-            try:
-                state_path = os.path.join(project_dir, 'project_state.json')
-                if not os.path.exists(state_path):
-                    raise ValueError("Project ID not found.")
+            if action == 'load_project':
+                try:
+                    state_path = os.path.join(project_dir, 'project_state.json')
+                    if not os.path.exists(state_path):
+                        raise ValueError("Project ID not found.")
 
-                with open(state_path, 'r') as f:
-                    state = json.load(f)
+                    with open(state_path, 'r') as f:
+                        state = json.load(f)
 
-                for key, value in state.items():
-                    session[key] = value
+                    session.clear()
+                    for key, value in state.items():
+                        session[key] = value
 
-                return redirect(url_for('data_viewer'))
-            except Exception as e:
-                error_message = f"Error loading project: {e}"
+                    return redirect(url_for('data_viewer'))
+                except Exception as e:
+                    error_message = f"Error loading project: {e}"
 
-        elif action == 'delete_project':
-            try:
-                if os.path.exists(project_dir):
-                    shutil.rmtree(project_dir)
-                    success_message = f"Project '{project_id}' deleted successfully."
-                else:
-                    error_message = "Project not found."
-            except Exception as e:
-                error_message = f"Error deleting project: {e}"
+            elif action == 'delete_project':
+                try:
+                    if os.path.exists(project_dir):
+                        shutil.rmtree(project_dir)
+                        success_message = f"Project '{project_id}' deleted successfully."
+                    else:
+                        error_message = "Project not found."
+                except Exception as e:
+                    error_message = f"Error deleting project: {e}"
 
-    # For GET request, list all projects
+
     project_list = [d for d in os.listdir(app.config['UPLOAD_FOLDER']) if os.path.isdir(os.path.join(app.config['UPLOAD_FOLDER'], d)) and d.startswith('project_')]
 
     return render_template('projects.html', projects=project_list, error=error_message, success=success_message)
 
 
 
-
 @app.route('/data_viewer')
 def data_viewer():
-
     df, error_message = _get_df_from_project()
 
     if error_message:
@@ -333,9 +322,10 @@ def data_cleaning():
                 _save_df_to_project(df)
                 _save_project_state()
 
-
         except Exception as e:
             new_error_message = f"An error occurred: {e}"
+
+
 
     df_head_html, _, _, columns, _ = get_dataframe_summary(df)
     current_stage, progress_percent = _get_progress_data("Data Cleaning")
@@ -494,9 +484,9 @@ def data_engineering():
                 _save_df_to_project(df)
                 _save_project_state()
 
-
         except Exception as e:
             new_error_message = f"An error occurred: {e}"
+
 
     df_head_html, _, _, columns, _ = get_dataframe_summary(df)
     current_stage, progress_percent = _get_progress_data("Feature Engineering")
