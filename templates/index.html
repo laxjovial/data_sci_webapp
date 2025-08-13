@@ -1,103 +1,79 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="row">
-    <div class="col-md-12">
+<div class="row justify-content-center">
+    <div class="col-md-10 text-center">
         <div class="card shadow-sm">
-            <div class="card-header bg-primary text-white">
-                <h4>Phase 1: Data Ingestion</h4>
-                <p class="mb-0">
-                    <span class="fw-bold">Technical:</span> This module provides a flexible interface for loading
-                    data from various sources, including remote URLs (GitHub, Google Drive) and local file
-                    uploads. It supports common formats like CSV and Excel.
-                    <br>
-                    <span class="fw-bold">Layman:</span> Let's get your data into the app. You can upload a file directly
-                    from your computer or paste a link from the web. This is the first step on our journey.
-                </p>
-            </div>
-            <div class="card-body">
+
+            <div class="card-body p-5">
+                <h1 class="card-title">Welcome to the Data Science Pipeline</h1>
+                <p class="lead">Your one-stop tool for data analysis and machine learning.</p>
+                <hr class="my-4">
+
+
                 {% if error %}
                 <div class="alert alert-danger" role="alert">
                     {{ error }}
                 </div>
                 {% endif %}
 
-                <form action="{{ url_for('index') }}" method="post" enctype="multipart/form-data" class="mt-3">
-                    <div class="mb-3">
-                        <label for="source_type_select" class="form-label fw-bold">Choose Your Data Source</label>
-                        <select class="form-select" id="source_type_select" name="source_type">
-                            <option value="upload" selected>Upload from Device</option>
-                            <option value="url">From a Web Link (URL)</option>
-                        </select>
-                    </div>
 
-                    <!-- Upload from Device Section -->
-                    <div id="upload_section">
-                        <div class="mb-3">
-                            <label for="file" class="form-label">Choose a file from your computer</label>
-                            <input type="file" class="form-control" id="file" name="file" accept=".csv, .xls, .xlsx">
-                            <div class="form-text">
-                                <span class="fw-bold">Supported formats:</span> CSV, XLS, XLSX.
-                                <br>
-                                <span class="fw-bold">Layman:</span> Select the CSV or Excel file you want to analyze.
-                                The app will upload it securely.
+                <div class="row">
+                    <!-- Create New Project -->
+                    <div class="col-md-6 border-end">
+                        <h4 class="mb-3">Start a New Project</h4>
+                        <p>Upload a new dataset from your device or a URL to begin the analysis pipeline.</p>
+                        <form action="{{ url_for('index') }}" method="post" enctype="multipart/form-data">
+                            <input type="hidden" name="action" value="create_project">
+                             <div class="mb-3">
+                                <label for="source_type_select" class="form-label fw-bold">Data Source:</label>
+                                <select class="form-select" id="source_type_select" name="source_type">
+                                    <option value="upload" selected>Upload from Device</option>
+                                    <option value="url">From a Web Link (URL)</option>
+                                </select>
                             </div>
-                        </div>
-                    </div>
 
-                    <!-- From URL Section -->
-                    <div id="url_section" style="display: none;">
-                        <div class="mb-3">
-                            <label for="url-input" class="form-label">Dataset URL</label>
-                            <input type="url" class="form-control" id="url-input" name="url" placeholder="Paste a link to your data file">
-                            <div class="form-text">
-                                <span class="fw-bold">How it works:</span> The app can download data directly from links.
-                                This is great for datasets stored online.
-                                <br>
-                                <span class="fw-bold">Supported Links:</span>
-                                <ul>
-                                    <li><strong class="text-success">GitHub:</strong> Just paste the regular GitHub link to the file. The app handles the rest.</li>
-                                    <li><strong class="text-success">Google Drive:</strong> Share your file or Google Sheet so "anyone with the link can view," then paste the link here.</li>
-                                    <li><strong class="text-success">Raw Links:</strong> Direct links to CSV or Excel files.</li>
-                                </ul>
+                            <div id="upload_section" class="mb-3">
+                                <input type="file" class="form-control" name="file" accept=".csv, .xls, .xlsx">
                             </div>
-                        </div>
+
+                            <div id="url_section" class="mb-3" style="display: none;">
+                                <input type="url" class="form-control" name="url" placeholder="Paste a link to your data file">
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100">Create New Project</button>
+                        </form>
                     </div>
 
-                    <button type="submit" class="btn btn-primary w-100 mt-3">Load Dataset</button>
-                </form>
+                    <!-- Load Existing Project -->
+                    <div class="col-md-6">
+                        <h4 class="mb-3">Load & Manage Projects</h4>
+                        <p>Resume a previous session or manage your saved projects.</p>
+                        <a href="{{ url_for('projects') }}" class="btn btn-success w-100">Go to Projects Page</a>
+                    </div>
+                </div>
+
             </div>
         </div>
     </div>
 </div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const sourceSelect = document.getElementById('source_type_select');
-        const uploadSection = document.getElementById('upload_section');
-        const urlSection = document.getElementById('url_section');
-        const fileInput = document.getElementById('file');
-        const urlInput = document.getElementById('url-input');
 
-        function toggleSections() {
-            if (sourceSelect.value === 'upload') {
-                uploadSection.style.display = 'block';
-                urlSection.style.display = 'none';
-                fileInput.required = true;
-                urlInput.required = false;
-            } else {
-                uploadSection.style.display = 'none';
-                urlSection.style.display = 'block';
-                fileInput.required = false;
-                urlInput.required = true;
-            }
+document.addEventListener('DOMContentLoaded', function () {
+    const sourceSelect = document.getElementById('source_type_select');
+    const uploadSection = document.getElementById('upload_section');
+    const urlSection = document.getElementById('url_section');
+
+    sourceSelect.addEventListener('change', function() {
+        if (this.value === 'upload') {
+            uploadSection.style.display = 'block';
+            urlSection.style.display = 'none';
+        } else {
+            uploadSection.style.display = 'none';
+            urlSection.style.display = 'block';
         }
-
-        // Initial state
-        toggleSections();
-
-        // Event listener for changes
-        sourceSelect.addEventListener('change', toggleSections);
     });
+});
+
 </script>
 {% endblock %}

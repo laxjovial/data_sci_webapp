@@ -2,6 +2,10 @@
 
 import os
 import uuid
+
+import json
+import shutil
+
 from flask import Flask, render_template, request, redirect, url_for, session, send_file
 from werkzeug.utils import secure_filename
 from utils.data_ingestion import load_data, get_dataframe_summary
@@ -38,39 +42,60 @@ PIPELINE_STAGES = [
     "Feature Engineering", "Model Building", "Model Evaluation", "Export & Finalization"
 ]
 
-def _get_df_from_filepath():
-    """
-    Retrieves the DataFrame from the file path stored in the session.
-    """
-    if 'filepath' in session:
-        filepath = session['filepath']
-        file_ext = session.get('file_ext', '.csv') # Default to csv
+
+def _get_project_dir():
+    if 'project_id' in session:
+        return os.path.join(app.config['UPLOAD_FOLDER'], session['project_id'])
+    return None
+
+def _get_df_from_project():
+    project_dir = _get_project_dir()
+    if project_dir:
+        state_path = os.path.join(project_dir, 'project_state.json')
         try:
-            if file_ext == '.csv':
-                df = pd.read_csv(filepath)
+            with open(state_path, 'r') as f:
+                state = json.load(f)
+            data_path = os.path.join(project_dir, state['data_filename'])
+            if state['data_filename'].endswith('.csv'):
+                df = pd.read_csv(data_path)
             else:
-                df = pd.read_excel(filepath)
+                df = pd.read_excel(data_path)
             return df, None
         except Exception as e:
-            return None, f"Error reading file: {e}"
-    return None, "No dataset loaded. Please upload one."
+            return None, f"Error loading project data: {e}"
+    return None, "No project loaded. Please create or load a project."
 
-def _save_df_to_filepath(df):
-    """
-    Saves the DataFrame to the file path stored in the session.
-    """
-    if 'filepath' in session:
-        filepath = session['filepath']
-        file_ext = session.get('file_ext', '.csv')
+def _save_df_to_project(df):
+    project_dir = _get_project_dir()
+    if project_dir:
+        state_path = os.path.join(project_dir, 'project_state.json')
         try:
-            if file_ext == '.csv':
-                df.to_csv(filepath, index=False)
+            with open(state_path, 'r') as f:
+                state = json.load(f)
+            data_path = os.path.join(project_dir, state['data_filename'])
+            if state['data_filename'].endswith('.csv'):
+                df.to_csv(data_path, index=False)
             else:
-                df.to_excel(filepath, index=False)
+                df.to_excel(data_path, index=False)
             return True, None
         except Exception as e:
-            return False, f"Error saving file: {e}"
-    return False, "Filepath not found in session."
+            return False, f"Error saving project data: {e}"
+    return False, "No project loaded."
+
+def _save_project_state():
+    project_dir = _get_project_dir()
+    if project_dir:
+        state_path = os.path.join(project_dir, 'project_state.json')
+        state = {
+            'project_id': session.get('project_id'),
+            'data_filename': session.get('data_filename'),
+            'code_log': session.get('code_log', []),
+            'last_run_features': session.get('last_run_features'),
+            'last_run_target': session.get('last_run_target'),
+            'last_run_problem_type': session.get('last_run_problem_type')
+        }
+        with open(state_path, 'w') as f:
+            json.dump(state, f, indent=4)
 
 def _get_progress_data(current_stage_name):
     try:
@@ -86,46 +111,120 @@ def _get_progress_data(current_stage_name):
 def index():
     error_message = None
     if request.method == 'POST':
-        source_type = request.form.get('source_type')
-        df = None
 
+        action = request.form.get('action')
+        
         try:
-            if source_type == 'url':
-                url = request.form.get('url')
-                df, error_message = load_data(source_type='url', source_path_or_file=url)
-                if df is not None:
-                    file_ext = '.csv' if '.csv' in url else '.xlsx'
-            elif source_type == 'upload':
-                file = request.files.get('file')
-                if file and file.filename:
-                    _, file_ext = os.path.splitext(file.filename)
-                    if file_ext.lower() not in ['.csv', '.xls', '.xlsx']:
-                        raise ValueError("Unsupported file type. Please upload CSV or Excel.")
-                    df, error_message = load_data(source_type='upload', source_path_or_file=file)
-                else:
-                    raise ValueError("No file selected for upload.")
-            else:
-                raise ValueError("Invalid data source type.")
+            if action == 'load_project':
+                project_id = request.form.get('project_id')
+                project_dir = os.path.join(app.config['UPLOAD_FOLDER'], project_id)
+                state_path = os.path.join(project_dir, 'project_state.json')
+                if not os.path.exists(state_path):
+                    raise ValueError("Project ID not found.")
 
-            if df is not None:
-                filename = f"{uuid.uuid4()}{file_ext}"
-                filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                session['filepath'] = filepath
-                session['file_ext'] = file_ext
-                session['code_log'] = [f"df = pd.read_csv('{filepath}')" if file_ext == '.csv' else f"df = pd.read_excel('{filepath}')"]
-                _save_df_to_filepath(df)
+                with open(state_path, 'r') as f:
+                    state = json.load(f)
+
+                # Load state into session
+                for key, value in state.items():
+                    session[key] = value
+
                 return redirect(url_for('data_viewer'))
+
+            elif action == 'create_project':
+                source_type = request.form.get('source_type')
+                df = None
+                if source_type == 'url':
+                    url = request.form.get('url')
+                    df, error_message = load_data(source_type='url', source_path_or_file=url)
+                    if df is not None:
+                        file_ext = '.csv' if '.csv' in url else '.xlsx'
+                elif source_type == 'upload':
+                    file = request.files.get('file')
+                    if file and file.filename:
+                        _, file_ext = os.path.splitext(file.filename)
+                        if file_ext.lower() not in ['.csv', '.xls', '.xlsx']:
+                            raise ValueError("Unsupported file type.")
+                        df, error_message = load_data(source_type='upload', source_path_or_file=file)
+                    else:
+                        raise ValueError("No file selected.")
+
+                if df is not None:
+                    project_id = f"project_{uuid.uuid4().hex[:12]}"
+                    project_dir = os.path.join(app.config['UPLOAD_FOLDER'], project_id)
+                    os.makedirs(project_dir, exist_ok=True)
+
+                    data_filename = f"data{file_ext}"
+                    data_path = os.path.join(project_dir, data_filename)
+
+                    session['project_id'] = project_id
+                    session['data_filename'] = data_filename
+                    session['code_log'] = [f"df = pd.read_csv('data.csv')"] if file_ext == '.csv' else [f"df = pd.read_excel('data.xlsx')"]
+
+                    if file_ext == '.csv':
+                        df.to_csv(data_path, index=False)
+                    else:
+                        df.to_excel(data_path, index=False)
+
+                    _save_project_state()
+                    return redirect(url_for('data_viewer'))
+
 
         except Exception as e:
             error_message = str(e)
 
-    current_stage, progress_percent = _get_progress_data("Data Ingestion")
-    return render_template('index.html', error=error_message, current_stage=current_stage, progress_percent=progress_percent)
+
+    return render_template('index.html', error=error_message)
+
+
+@app.route('/projects', methods=['GET', 'POST'])
+def projects():
+    error_message = None
+    success_message = None
+    if request.method == 'POST':
+        action = request.form.get('action')
+        project_id = request.form.get('project_id')
+        project_dir = os.path.join(app.config['UPLOAD_FOLDER'], project_id)
+
+        if action == 'load_project':
+            try:
+                state_path = os.path.join(project_dir, 'project_state.json')
+                if not os.path.exists(state_path):
+                    raise ValueError("Project ID not found.")
+
+                with open(state_path, 'r') as f:
+                    state = json.load(f)
+
+                for key, value in state.items():
+                    session[key] = value
+
+                return redirect(url_for('data_viewer'))
+            except Exception as e:
+                error_message = f"Error loading project: {e}"
+
+        elif action == 'delete_project':
+            try:
+                if os.path.exists(project_dir):
+                    shutil.rmtree(project_dir)
+                    success_message = f"Project '{project_id}' deleted successfully."
+                else:
+                    error_message = "Project not found."
+            except Exception as e:
+                error_message = f"Error deleting project: {e}"
+
+    # For GET request, list all projects
+    project_list = [d for d in os.listdir(app.config['UPLOAD_FOLDER']) if os.path.isdir(os.path.join(app.config['UPLOAD_FOLDER'], d)) and d.startswith('project_')]
+
+    return render_template('projects.html', projects=project_list, error=error_message, success=success_message)
+
+
 
 
 @app.route('/data_viewer')
 def data_viewer():
-    df, error_message = _get_df_from_filepath()
+
+    df, error_message = _get_df_from_project()
+
     if error_message:
         return redirect(url_for('index'))
 
@@ -139,7 +238,9 @@ def data_viewer():
 
 @app.route('/data_cleaning', methods=['GET', 'POST'])
 def data_cleaning():
-    df, error_message = _get_df_from_filepath()
+
+    df, error_message = _get_df_from_project()
+
     if error_message:
         return redirect(url_for('index'))
 
@@ -228,7 +329,10 @@ def data_cleaning():
                     success_message = "DataFrame index has been reset."
 
             if new_error_message is None:
-                _save_df_to_filepath(df)
+
+                _save_df_to_project(df)
+                _save_project_state()
+
 
         except Exception as e:
             new_error_message = f"An error occurred: {e}"
@@ -243,7 +347,9 @@ def data_cleaning():
 
 @app.route('/data_eda', methods=['GET', 'POST'])
 def data_eda():
-    df, error_message = _get_df_from_filepath()
+
+    df, error_message = _get_df_from_project()
+
     if error_message:
         return redirect(url_for('index'))
 
@@ -291,7 +397,9 @@ def data_eda():
 
 @app.route('/data_filtering', methods=['GET', 'POST'])
 def data_filtering():
-    df, error_message = _get_df_from_filepath()
+
+    df, error_message = _get_df_from_project()
+
     if error_message:
         return redirect(url_for('index'))
 
@@ -307,10 +415,13 @@ def data_filtering():
             original_rows = len(df)
             df, new_error_message = filter_dataframe(df, column, operator, value)
             if new_error_message is None:
-                _save_df_to_filepath(df)
+
+                _save_df_to_project(df)
                 filtered_rows = len(df)
                 success_message = f"Filter applied successfully. Showing {filtered_rows} of {original_rows} rows."
                 session['code_log'].append(f"df = df[df['{column}'] {operator} '{value}'] # Adjust value quoting for strings vs. numbers")
+                _save_project_state()
+
         except Exception as e:
             new_error_message = f"An error occurred during filtering: {e}"
 
@@ -330,7 +441,9 @@ def data_filtering():
 
 @app.route('/data_engineering', methods=['GET', 'POST'])
 def data_engineering():
-    df, error_message = _get_df_from_filepath()
+
+    df, error_message = _get_df_from_project()
+
     if error_message:
         return redirect(url_for('index'))
 
@@ -377,7 +490,10 @@ def data_engineering():
                     success_message = "Columns renamed/dropped."
 
             if new_error_message is None:
-                _save_df_to_filepath(df)
+
+                _save_df_to_project(df)
+                _save_project_state()
+
 
         except Exception as e:
             new_error_message = f"An error occurred: {e}"
@@ -392,7 +508,9 @@ def data_engineering():
 
 @app.route('/data_aggregation', methods=['GET', 'POST'])
 def data_aggregation():
-    df, error_message = _get_df_from_filepath()
+
+    df, error_message = _get_df_from_project()
+
     if error_message:
         return redirect(url_for('index'))
 
@@ -444,7 +562,8 @@ def data_aggregation():
 
 @app.route('/data_combining', methods=['GET', 'POST'])
 def data_combining():
-    left_df, error_message = _get_df_from_filepath()
+    left_df, error_message = _get_df_from_project()
+
     if error_message:
         return redirect(url_for('index'))
 
@@ -490,7 +609,9 @@ def data_combining():
 
                     if new_error_message is None:
                         # Overwrite the main df with the result
-                        _save_df_to_filepath(combined_df)
+
+                        _save_df_to_project(combined_df)
+
                         result_df_head = combined_df.head().to_html(classes=['table', 'table-striped', 'table-sm'])
                         success_message = f"DataFrames combined successfully using '{method}'."
                         # Clean up the right dataframe from session and disk
@@ -520,7 +641,8 @@ def data_combining():
 
 @app.route('/model_building', methods=['GET', 'POST'])
 def model_building():
-    df, error_message = _get_df_from_filepath()
+    df, error_message = _get_df_from_project()
+
     if error_message:
         return redirect(url_for('index'))
 
@@ -581,7 +703,8 @@ def model_building():
 
 @app.route('/model_tuning/<model_name>', methods=['GET', 'POST'])
 def model_tuning(model_name):
-    df, error_message = _get_df_from_filepath()
+    df, error_message = _get_df_from_project()
+
     if error_message:
         return redirect(url_for('index'))
 
@@ -647,7 +770,9 @@ def user_guide():
 
 @app.route('/export', methods=['GET', 'POST'])
 def export():
-    df, error_message = _get_df_from_filepath()
+
+    df, error_message = _get_df_from_project()
+
     if error_message:
         return redirect(url_for('index'))
 
