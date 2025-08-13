@@ -53,7 +53,7 @@ def create_new_feature(df, col1, col2, operation, new_col_name):
     except Exception as e:
         return None, f"An error occurred during feature creation: {e}"
 
-def apply_encoding(df, columns, encoding_type):
+def apply_encoding(df, columns, encoding_type, **kwargs):
     """
     Applies various encoding techniques to specified categorical columns.
 
@@ -71,130 +71,36 @@ def apply_encoding(df, columns, encoding_type):
         df (pd.DataFrame): The input DataFrame.
         columns (list): A list of column names to encode.
         encoding_type (str): The type of encoding to apply ('one_hot', 'label', 'ordinal', 'frequency').
+        **kwargs: Additional arguments for specific encoders (e.g., categories for OrdinalEncoder).
 
     Returns:
         tuple: The DataFrame with encoded columns and an error message (if any).
     """
     df_encoded = df.copy()
     error_message = None
-
-    if encoding_type == 'label':
-        # Label Encoding is best for binary categories like 'male'/'female'
-        for col in columns:
-            if df_encoded[col].nunique() <= 2:
-                try:
-                    le = LabelEncoder()
-                    df_encoded[col] = le.fit_transform(df_encoded[col])
-                except Exception as e:
-                    error_message = f"Error applying Label Encoding to '{col}': {e}"
-                    return df, error_message
-            else:
-                error_message = f"Label Encoding is recommended for binary columns. '{col}' has more than 2 unique values."
-                return df, error_message
-                
-    elif encoding_type == 'ordinal':
-        # Ordinal Encoding is for categories with a clear order, like 'little' < 'moderate' < 'rich'
-        try:
-            oe = OrdinalEncoder()
-            df_encoded[columns] = oe.fit_transform(df_encoded[columns])
-        except Exception as e:
-            error_message = f"Error applying Ordinal Encoding: {e}"
-            return df, error_message
-            
-    elif encoding_type == 'one_hot':
-        # One-Hot Encoding is for nominal categories with no order.
-        try:
-            ohe = OneHotEncoder(handle_unknown='ignore', sparse_output=False)
-            encoded_data = ohe.fit_transform(df_encoded[columns])
-            encoded_df = pd.DataFrame(encoded_data, columns=ohe.get_feature_names_out(columns))
-            
-            df_encoded.drop(columns=columns, inplace=True)
-            df_encoded.reset_index(drop=True, inplace=True)
-            encoded_df.reset_index(drop=True, inplace=True)
-            
-            df_encoded = pd.concat([df_encoded, encoded_df], axis=1)
-        except Exception as e:
-            error_message = f"Error applying One-Hot Encoding: {e}"
-            return df, error_message
-            
-    elif encoding_type == 'frequency':
-        # Frequency Encoding replaces categories with the proportion of their occurrence.
-        try:
-            for col in columns:
-                frequency_map = df_encoded[col].value_counts(normalize=True)
-                df_encoded[col] = df_encoded[col].map(frequency_map)
-        except Exception as e:
-            error_message = f"Error applying Frequency Encoding: {e}"
-            return df, error_message
-
-    else:
-        error_message = "Invalid encoding type selected."
-
-    return df_encoded, error_message
-
-
-def scale_features(df, columns, scaler_type):
-    """
-    Scales numerical features using a specified method.
-
-    Technical: This function uses either StandardScaler or MinMaxScaler from
-    scikit-learn to transform numerical data. StandardScaler normalizes the data
-    to have a mean of 0 and a standard deviation of 1.
-
-    Layman: This is like putting all your numbers on the same playing field. If you
-    have a column for "age" (e.g., 20-80) and a column for "income" (e.g., $10k-$1M),
-    a model might think income is more important just because the numbers are
-    bigger. Scaling evens out the numbers so the model can focus on the patterns.
-
-    Args:
-        df (pd.DataFrame): The input DataFrame.
-        columns (list): A list of numerical column names to scale.
-        scaler_type (str): The type of scaler to use ('standard', 'minmax').
-
-    Returns:
-        tuple: A tuple containing the new DataFrame and an error message (if any).
-    """
-    df_engineered = df.copy()
     try:
-        if scaler_type == 'standard':
-            scaler = StandardScaler()
-        elif scaler_type == 'minmax':
-            from sklearn.preprocessing import MinMaxScaler
-            scaler = MinMaxScaler()
-        else:
-            return None, "Error: Invalid scaler type. Use 'standard' or 'minmax'."
+        for col in columns:
+            if not pd.api.types.is_categorical_dtype(df_encoded[col]) and not pd.api.types.is_object_dtype(df_encoded[col]):
+                continue
 
-        df_engineered[columns] = scaler.fit_transform(df_engineered[columns])
-        return df_engineered, None
+            if encoding_type == 'label':
+                le = LabelEncoder()
+                df_encoded[col] = le.fit_transform(df_encoded[col])
+            elif encoding_type == 'ordinal':
+                oe = OrdinalEncoder(**kwargs)
+                df_encoded[col] = oe.fit_transform(df_encoded[[col]])
+            elif encoding_type == 'one_hot':
+                ohe = OneHotEncoder(handle_unknown='ignore', sparse_output=False)
+                encoded_cols = ohe.fit_transform(df_encoded[[col]])
+                encoded_df = pd.DataFrame(encoded_cols, columns=ohe.get_feature_names_out([col]), index=df_encoded.index)
+                df_encoded = pd.concat([df_encoded.drop(col, axis=1), encoded_df], axis=1)
+            elif encoding_type == 'frequency':
+                freq_map = df_encoded[col].value_counts(normalize=True)
+                df_encoded[col] = df_encoded[col].map(freq_map)
+            else:
+                error_message = f"Error: Invalid encoding type '{encoding_type}'."
+                return df, error_message
+        return df_encoded, None
     except Exception as e:
-        return None, f"An error occurred during feature scaling: {e}"
-
-def rename_and_drop_columns(df, new_column_name=None, old_column_name=None, columns_to_drop=None):
-    """
-    Renames a column and/or drops multiple columns from the DataFrame.
-
-    Technical: This is a utility function that uses the pandas.DataFrame.rename
-    and pandas.DataFrame.drop methods to modify the DataFrame's column structure.
-    It's designed to be a flexible way to handle both renaming and dropping in one
-    function.
-
-    Layman: This is for organizing your data. You can give a column a new, more
-    descriptive name (like changing 'col1' to 'product_id'), and you can get rid of
-    columns that you don't need for your analysis.
-
-    Args:
-        df (pd.DataFrame): The input DataFrame.
-        new_column_name (str, optional): The new name for a column.
-        old_column_name (str, optional): The old name of the column to be renamed.
-        columns_to_drop (list, optional): A list of columns to be dropped.
-
-    Returns:
-        pd.DataFrame: The DataFrame with renamed and/or dropped columns.
-    """
-    df_engineered = df.copy()
-    if old_column_name and new_column_name:
-        df_engineered.rename(columns={old_column_name: new_column_name}, inplace=True)
-    if columns_to_drop:
-        df_engineered.drop(columns=columns_to_drop, inplace=True, errors='ignore')
-        
-    return df_engineered, None
+        error_message = f"An error occurred during encoding: {e}"
+        return df, error_message
