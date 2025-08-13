@@ -11,7 +11,7 @@ import plotly.graph_objs as go
 import plotly.express as px
 
 # Import your corrected Python modules
-from utils.data_ingestion import ingest_data
+from utils.data_ingestion import load_data, get_dataframe_summary
 from utils.data_cleaning import handle_missing_values, rename_column, convert_dtype, remove_duplicates, standardize_text
 from utils.data_aggregation import group_by_aggregate
 from utils.data_filtering import filter_dataframe
