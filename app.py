@@ -185,6 +185,7 @@ def projects():
                     with open(state_path, 'r') as f:
                         state = json.load(f)
 
+
                     session.clear()
                     for key, value in state.items():
                         session[key] = value
@@ -202,7 +203,6 @@ def projects():
                         error_message = "Project not found."
                 except Exception as e:
                     error_message = f"Error deleting project: {e}"
-
 
     project_list = [d for d in os.listdir(app.config['UPLOAD_FOLDER']) if os.path.isdir(os.path.join(app.config['UPLOAD_FOLDER'], d)) and d.startswith('project_')]
 
@@ -326,7 +326,6 @@ def data_cleaning():
             new_error_message = f"An error occurred: {e}"
 
 
-
     df_head_html, _, _, columns, _ = get_dataframe_summary(df)
     current_stage, progress_percent = _get_progress_data("Data Cleaning")
     return render_template('data_cleaning.html',
@@ -351,10 +350,15 @@ def data_eda():
         try:
             analysis_type = request.form.get('analysis_type')
 
+            color_col = request.form.get('color_col') or None # Use None if empty
+
+
             if analysis_type == 'univariate':
                 column = request.form.get('uni_column')
                 if column:
-                    plot_json = generate_univariate_plot(df, column)
+
+                    plot_json = generate_univariate_plot(df, column, color=color_col)
+
                 else:
                     new_error_message = "Please select a column for univariate analysis."
 
@@ -362,14 +366,18 @@ def data_eda():
                 x_col = request.form.get('bi_x_column')
                 y_col = request.form.get('bi_y_column')
                 if x_col and y_col:
-                    plot_json = generate_bivariate_plot(df, x_col, y_col)
+
+                    plot_json = generate_bivariate_plot(df, x_col, y_col, color=color_col)
+
                 else:
                     new_error_message = "Please select two columns for bivariate analysis."
 
             elif analysis_type == 'multivariate':
                 multi_columns = request.form.getlist('multi_columns')
                 if len(multi_columns) > 1:
-                    plot_json = generate_multivariate_plot(df, multi_columns)
+
+                    plot_json = generate_multivariate_plot(df, multi_columns, color=color_col)
+
                 else:
                     new_error_message = "Please select at least two columns for multivariate analysis."
 
