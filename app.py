@@ -15,8 +15,10 @@ from utils.data_engineering import (
 )
 from utils.data_filtering import filter_dataframe
 from utils.data_aggregation import group_by_aggregate, pivot_table
+
 from utils.data_combining import combine_dataframes
 from utils.modeling import get_model_list, run_models, get_hyperparameter_grid, tune_model_hyperparameters
+
 from utils.eda import generate_univariate_plot, generate_bivariate_plot, generate_multivariate_plot
 from utils.data_export import export_dataframe, export_ipynb
 import pandas as pd
@@ -439,6 +441,7 @@ def data_aggregation():
                            current_stage=current_stage, progress_percent=progress_percent)
 
 
+
 @app.route('/data_combining', methods=['GET', 'POST'])
 def data_combining():
     left_df, error_message = _get_df_from_filepath()
@@ -514,6 +517,7 @@ def data_combining():
                            current_stage="Data Combining", progress_percent=30)
 
 
+
 @app.route('/model_building', methods=['GET', 'POST'])
 def model_building():
     df, error_message = _get_df_from_filepath()
@@ -541,10 +545,12 @@ def model_building():
             results_table = results_df.drop(columns=['Confusion Matrix'], errors='ignore').to_html(classes=['table', 'table-striped', 'table-sm'])
             results_list = results_df.to_dict(orient='records')
 
+
             # Save the run configuration for the tuning step
             session['last_run_features'] = feature_cols
             session['last_run_target'] = target_col
             session['last_run_problem_type'] = problem_type
+
 
             return render_template('model_results.html',
                                    results_table=results_table,
@@ -570,6 +576,7 @@ def model_building():
                            models=get_model_list(),
                            current_stage=current_stage,
                            progress_percent=progress_percent)
+
 
 
 @app.route('/model_tuning/<model_name>', methods=['GET', 'POST'])
@@ -627,6 +634,7 @@ def model_tuning(model_name):
                            error=new_error_message,
                            current_stage="Model Improvement",
                            progress_percent=95)
+
 
 
 @app.route('/user_guide')
