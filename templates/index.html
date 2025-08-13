@@ -4,16 +4,19 @@
 <div class="row justify-content-center">
     <div class="col-md-10 text-center">
         <div class="card shadow-sm">
+
             <div class="card-body p-5">
                 <h1 class="card-title">Welcome to the Data Science Pipeline</h1>
                 <p class="lead">Your one-stop tool for data analysis and machine learning.</p>
                 <hr class="my-4">
+
 
                 {% if error %}
                 <div class="alert alert-danger" role="alert">
                     {{ error }}
                 </div>
                 {% endif %}
+
 
                 <div class="row">
                     <!-- Create New Project -->
@@ -48,12 +51,14 @@
                         <a href="{{ url_for('projects') }}" class="btn btn-success w-100">Go to Projects Page</a>
                     </div>
                 </div>
+
             </div>
         </div>
     </div>
 </div>
 
 <script>
+
 document.addEventListener('DOMContentLoaded', function () {
     const sourceSelect = document.getElementById('source_type_select');
     const uploadSection = document.getElementById('upload_section');
@@ -69,5 +74,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 });
+
 </script>
 {% endblock %}
