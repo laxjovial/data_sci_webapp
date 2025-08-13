@@ -18,6 +18,19 @@
                 {% endif %}
 
                 <form action="{{ url_for('model_tuning', model_name=model_name) }}" method="post" class="border p-3 mb-4">
+
+                    <h5 class="mb-3">Tuning Configuration</h5>
+                    <div class="mb-3">
+                        <label for="tuning_method" class="form-label"><strong>Tuning Strategy</strong></label>
+                        <select class="form-select" name="tuning_method" id="tuning_method">
+                            <option value="grid">Grid Search (Exhaustive)</option>
+                            <option value="random">Random Search (Faster)</option>
+                            <option value="bayesian">Bayesian Optimization (Smart Search)</option>
+                        </select>
+                        <div class="form-text">Choose how you want to search for the best parameters.</div>
+                    </div>
+                    <hr>
+
                     <h5 class="mb-3">Parameter Grid</h5>
                     <p>Enter comma-separated values for the hyperparameters you want to test. The system will try all combinations.</p>
 

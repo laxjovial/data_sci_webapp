@@ -54,25 +54,38 @@
                             <option value="bivariate">Bivariate Analysis (compare two variables)</option>
                             <option value="multivariate">Multivariate Analysis (find correlations)</option>
                         </select>
+
                     </div>
 
                     <!-- Univariate Analysis Form -->
                     <div id="univariate_form" class="analysis-form">
-                        <div class="mb-3">
-                            <label for="uni_column" class="form-label">Select Column</label>
-                            <select class="form-select" name="uni_column" id="uni_column">
-                                <option value="" selected disabled>-- Choose a column --</option>
-                                {% for column in columns %}
-                                <option value="{{ column }}">{{ column }}</option>
-                                {% endfor %}
-                            </select>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="uni_column" class="form-label">Select Column</label>
+                                <select class="form-select" name="uni_column" id="uni_column">
+                                    <option value="" selected disabled>-- Choose a column --</option>
+                                    {% for column in columns %}
+                                    <option value="{{ column }}">{{ column }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="uni_plot_type" class="form-label">Plot Type</label>
+                                <select class="form-select" name="uni_plot_type" id="uni_plot_type">
+                                    <option value="histogram">Histogram (for numbers)</option>
+                                    <option value="violin">Violin Plot (for numbers)</option>
+                                    <option value="bar">Bar Chart (for text/categories)</option>
+                                    <option value="pie">Pie Chart (for text/categories)</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
 
                     <!-- Bivariate Analysis Form -->
                     <div id="bivariate_form" class="analysis-form" style="display: none;">
                         <div class="row">
-                            <div class="col-md-6">
+                             <div class="col-md-4 mb-3">
+
                                 <label for="bi_x_column" class="form-label">Select X-axis Column</label>
                                 <select class="form-select" name="bi_x_column" id="bi_x_column">
                                      <option value="" selected disabled>-- Choose X --</option>
@@ -81,13 +94,24 @@
                                     {% endfor %}
                                 </select>
                             </div>
-                            <div class="col-md-6">
+
+                             <div class="col-md-4 mb-3">
+
                                 <label for="bi_y_column" class="form-label">Select Y-axis Column</label>
                                 <select class="form-select" name="bi_y_column" id="bi_y_column">
                                      <option value="" selected disabled>-- Choose Y --</option>
                                     {% for column in columns %}
                                     <option value="{{ column }}">{{ column }}</option>
                                     {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="col-md-4 mb-3">
+                                <label for="bi_plot_type" class="form-label">Plot Type</label>
+                                <select class="form-select" name="bi_plot_type" id="bi_plot_type">
+                                    <option value="scatter">Scatter Plot (for numbers)</option>
+                                    <option value="density_heatmap">Density Heatmap (for numbers)</option>
+                                    <option value="box">Box Plot (for number vs category)</option>
                                 </select>
                             </div>
                         </div>
@@ -105,6 +129,7 @@
                             <div class="form-text">Hold Ctrl/Cmd to select multiple columns.</div>
                         </div>
                     </div>
+
 
                     <hr>
                     <div class="mb-3">

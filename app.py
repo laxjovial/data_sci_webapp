@@ -338,16 +338,22 @@ def data_eda():
 
             if analysis_type == 'univariate':
                 column = request.form.get('uni_column')
+
+                plot_type = request.form.get('uni_plot_type')
                 if column:
-                    plot_json = generate_univariate_plot(df, column, color=color_col)
+                    plot_json = generate_univariate_plot(df, column, plot_type, color=color_col)
+
                 else:
                     new_error_message = "Please select a column for univariate analysis."
 
             elif analysis_type == 'bivariate':
                 x_col = request.form.get('bi_x_column')
                 y_col = request.form.get('bi_y_column')
+
+                plot_type = request.form.get('bi_plot_type')
                 if x_col and y_col:
-                    plot_json = generate_bivariate_plot(df, x_col, y_col, color=color_col)
+                    plot_json = generate_bivariate_plot(df, x_col, y_col, plot_type, color=color_col)
+
                 else:
                     new_error_message = "Please select two columns for bivariate analysis."
 

@@ -5,4 +5,9 @@ scikit-learn
 plotly
 requests
 openpyxl
+
 gunicorn
+lightgbm
+catboost
+scikit-optimize
+

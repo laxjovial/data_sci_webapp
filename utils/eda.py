@@ -2,51 +2,66 @@ import pandas as pd
 import plotly.express as px
 import plotly.io as pio
 
-def generate_univariate_plot(df, column, color=None):
+
+def generate_univariate_plot(df, column, plot_type='histogram', color=None):
     """
     Generates a univariate plot for a given column.
-    - Histogram for numeric data.
-    - Bar chart (countplot) for categorical data.
-    Can be color-coded by another column.
     """
-    title = f'Distribution of {column}'
+    title = f'Univariate Analysis of {column}'
+
     if color:
         title += f' by {color}'
 
     if pd.api.types.is_numeric_dtype(df[column]):
-        fig = px.histogram(df, x=column, color=color, title=title, marginal='box', barmode='overlay')
+
+        if plot_type == 'histogram':
+            fig = px.histogram(df, x=column, color=color, title=title, marginal='box', barmode='overlay')
+        elif plot_type == 'violin':
+            fig = px.violin(df, y=column, color=color, title=title, box=True, points="all")
+        else: # Default to histogram
+            fig = px.histogram(df, x=column, color=color, title=title, marginal='box', barmode='overlay')
         fig.update_layout(bargap=0.1)
-    else:
-        # For categorical, we need to group by both the main column and the color column
-        if color:
-            data = df.groupby([column, color]).size().reset_index(name='count')
-            fig = px.bar(data, x=column, y='count', color=color, title=title, barmode='group')
-        else:
-            fig = px.bar(df[column].value_counts(), title=title)
-        fig.update_layout(xaxis_title=column, yaxis_title='Count')
+    else: # Categorical
+        if plot_type == 'pie':
+             # Pie chart doesn't handle color grouping well, so we ignore it if selected
+            data = df[column].value_counts().reset_index()
+            data.columns = [column, 'count']
+            fig = px.pie(data, names=column, values='count', title=title)
+        else: # Default to bar chart
+            if color:
+                data = df.groupby([column, color]).size().reset_index(name='count')
+                fig = px.bar(data, x=column, y='count', color=color, title=title, barmode='group')
+            else:
+                fig = px.bar(df[column].value_counts(), title=title)
+            fig.update_layout(xaxis_title=column, yaxis_title='Count')
 
     return pio.to_json(fig)
 
-def generate_bivariate_plot(df, x_col, y_col, color=None):
+def generate_bivariate_plot(df, x_col, y_col, plot_type='scatter', color=None):
     """
     Generates a bivariate plot for two given columns.
-    - Scatter plot for two numeric columns.
-    - Box plot for one numeric and one categorical column.
-    - Heatmap for two categorical columns (color is ignored).
-    Can be color-coded by another column.
     """
-    title = f'{x_col} vs. {y_col}'
+    title = f'Bivariate Analysis: {x_col} vs. {y_col}'
     if color:
         title += f' by {color}'
 
+    # Both Numeric
     if pd.api.types.is_numeric_dtype(df[x_col]) and pd.api.types.is_numeric_dtype(df[y_col]):
-        fig = px.scatter(df, x=x_col, y=y_col, color=color, title=title, trendline="ols")
+        if plot_type == 'density_heatmap':
+            fig = px.density_heatmap(df, x=x_col, y=y_col, title=title, marginal_x="histogram", marginal_y="histogram")
+        else: # Default to scatter
+            fig = px.scatter(df, x=x_col, y=y_col, color=color, title=title, trendline="ols")
+
+    # One Numeric, One Categorical
     elif pd.api.types.is_numeric_dtype(df[x_col]) and not pd.api.types.is_numeric_dtype(df[y_col]):
-        fig = px.box(df, x=y_col, y=x_col, color=color, title=title)
+        fig = px.box(df, x=y_col, y=x_col, color=color, title=title) # Box plot is standard here
     elif not pd.api.types.is_numeric_dtype(df[x_col]) and pd.api.types.is_numeric_dtype(df[y_col]):
-        fig = px.box(df, x=x_col, y=y_col, color=color, title=title)
+        fig = px.box(df, x=x_col, y=y_col, color=color, title=title) # Box plot is standard here
+
+    # Both Categorical
     else:
-        # For two categorical columns, create a crosstab and then a heatmap. Color is ignored.
+        # Heatmap is standard here, color is ignored.
+
         crosstab = pd.crosstab(df[x_col], df[y_col])
         fig = px.imshow(crosstab, title=f'Heatmap of {x_col} vs. {y_col}', text_auto=True)
 
