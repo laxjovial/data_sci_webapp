@@ -1,164 +1,111 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="row">
-    <div class="col-md-12">
-        <h2 class="mb-4">Data Cleaning</h2>
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <h2>Data Cleaning</h2>
+            <p>Perform various data cleaning operations on your dataset.</p>
+        </div>
     </div>
-</div>
 
-<div class="row">
-    <div class="col-md-6 mb-4">
-        <div class="card">
-            <div class="card-header">
-                Handle Missing Values
-            </div>
-            <div class="card-body">
-                <form action="{{ url_for('data_cleaning') }}" method="POST">
-                    <input type="hidden" name="action" value="handle_missing_values">
-                    <div class="mb-3">
-                        <label for="missing_columns" class="form-label">Columns (Select multiple)</label>
-                        <select class="form-control" id="missing_columns" name="columns[]" multiple required>
-                            {% for column in columns %}
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4>Handle Missing Values</h4>
+                </div>
+                <div class="card-body">
+                    <form action="{{ url_for('data_cleaning') }}" method="post">
+                        <input type="hidden" name="action" value="handle_missing_values">
+                        <div class="mb-3">
+                            <label for="missing_columns" class="form-label">Columns</label>
+                            <select multiple class="form-control" id="missing_columns" name="columns[]" required>
+                                {% for column in columns %}
                                 <option value="{{ column }}">{{ column }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="strategy" class="form-label">Strategy</label>
-                        <select class="form-control" id="strategy" name="strategy" required>
-                            <option value="" disabled selected>Select a strategy</option>
-                            <option value="drop">Drop Rows</option>
-                            <option value="mean">Fill with Mean</option>
-                            <option value="median">Fill with Median</option>
-                            <option value="mode">Fill with Mode</option>
-                        </select>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Apply</button>
-                </form>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="strategy" class="form-label">Strategy</label>
+                            <select class="form-control" id="strategy" name="strategy" required>
+                                <option value="drop">Drop Rows</option>
+                                <option value="mean">Impute with Mean (Numeric)</option>
+                                <option value="median">Impute with Median (Numeric)</option>
+                                <option value="mode">Impute with Mode (Numeric & Categorical)</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Apply</button>
+                    </form>
+                </div>
             </div>
-        </div>
-    </div>
-
-    <div class="col-md-6 mb-4">
-        <div class="card">
-            <div class="card-header">
-                Rename Column
-            </div>
-            <div class="card-body">
-                <form action="{{ url_for('data_cleaning') }}" method="POST">
-                    <input type="hidden" name="action" value="rename_column">
-                    <div class="mb-3">
-                        <label for="old_col" class="form-label">Old Column Name</label>
-                        <select class="form-control" id="old_col" name="old_col" required>
-                            <option value="" disabled selected>Select a column</option>
-                            {% for column in columns %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4>Rename a Column</h4>
+                </div>
+                <div class="card-body">
+                    <form action="{{ url_for('data_cleaning') }}" method="post">
+                        <input type="hidden" name="action" value="rename_column">
+                        <div class="mb-3">
+                            <label for="old_col" class="form-label">Old Column Name</label>
+                            <select class="form-control" id="old_col" name="old_col" required>
+                                {% for column in columns %}
                                 <option value="{{ column }}">{{ column }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="new_col" class="form-label">New Column Name</label>
-                        <input type="text" class="form-control" id="new_col" name="new_col" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Apply</button>
-                </form>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="new_col" class="form-label">New Column Name</label>
+                            <input type="text" class="form-control" id="new_col" name="new_col" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Rename</button>
+                    </form>
+                </div>
             </div>
         </div>
-    </div>
-    
-    <div class="col-md-6 mb-4">
-        <div class="card">
-            <div class="card-header">
-                Convert Data Type
-            </div>
-            <div class="card-body">
-                <form action="{{ url_for('data_cleaning') }}" method="POST">
-                    <input type="hidden" name="action" value="convert_dtype">
-                    <div class="mb-3">
-                        <label for="dtype_column" class="form-label">Column</label>
-                        <select class="form-control" id="dtype_column" name="column" required>
-                            <option value="" disabled selected>Select a column</option>
-                            {% for column in columns %}
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4>Convert Data Type</h4>
+                </div>
+                <div class="card-body">
+                    <form action="{{ url_for('data_cleaning') }}" method="post">
+                        <input type="hidden" name="action" value="convert_dtype">
+                        <div class="mb-3">
+                            <label for="convert_column" class="form-label">Column</label>
+                            <select class="form-control" id="convert_column" name="column" required>
+                                {% for column in columns %}
                                 <option value="{{ column }}">{{ column }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="new_type" class="form-label">New Data Type</label>
-                        <select class="form-control" id="new_type" name="new_type" required>
-                            <option value="" disabled selected>Select a type</option>
-                            <option value="int">Integer</option>
-                            <option value="float">Float</option>
-                            <option value="str">String</option>
-                            <option value="datetime">Datetime</option>
-                        </select>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Apply</button>
-                </form>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="new_type" class="form-label">New Type</label>
+                            <select class="form-control" id="new_type" name="new_type" required>
+                                <option value="int">Integer</option>
+                                <option value="float">Float</option>
+                                <option value="str">String</option>
+                                <option value="datetime">Datetime</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Convert</button>
+                    </form>
+                </div>
             </div>
-        </div>
-    </div>
-
-    <div class="col-md-6 mb-4">
-        <div class="card">
-            <div class="card-header">
-                Standardize Text
-            </div>
-            <div class="card-body">
-                <form action="{{ url_for('data_cleaning') }}" method="POST">
-                    <input type="hidden" name="action" value="standardize_text">
-                    <div class="mb-3">
-                        <label for="text_columns" class="form-label">Columns (Select multiple)</label>
-                        <select class="form-control" id="text_columns" name="columns[]" multiple required>
-                            {% for column in columns %}
-                                <option value="{{ column }}">{{ column }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Apply</button>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-12 mb-4">
-        <div class="card">
-            <div class="card-header">
-                Remove Duplicate Rows
-            </div>
-            <div class="card-body">
-                <form action="{{ url_for('data_cleaning') }}" method="POST">
-                    <input type="hidden" name="action" value="remove_duplicates">
-                    <p>This will remove all rows that are identical to another row in the dataset.</p>
-                    <button type="submit" class="btn btn-danger">Remove Duplicates</button>
-                </form>
-            </div>
-        </div>
-    </div>
-
-</div>
-
-<div class="row">
-    <div class="col-md-12">
-        <div class="card">
-            <div class="card-header">
-                Current Data
-            </div>
-            <div class="card-body">
-                {% if error %}
-                    <div class="alert alert-danger">{{ error }}</div>
-                {% endif %}
-                {% if success %}
-                    <div class="alert alert-success">{{ success }}</div>
-                {% endif %}
-                {% if data_viewer %}
-                    {{ data_viewer|safe }}
-                {% else %}
-                    <p>No data to display. Please import a dataset first.</p>
-                {% endif %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4>Remove Duplicates</h4>
+                </div>
+                <div class="card-body">
+                    <form action="{{ url_for('data_cleaning') }}" method="post">
+                        <input type="hidden" name="action" value="remove_duplicates">
+                        <p>This will remove all duplicate rows from the dataset.</p>
+                        <button type="submit" class="btn btn-primary">Remove</button>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
 </div>
+{% include 'data_viewer.html' %}
 {% endblock %}
