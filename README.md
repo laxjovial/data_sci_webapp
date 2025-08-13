@@ -20,6 +20,14 @@ This is a full-featured web application designed to streamline the entire data s
     - Create new features from existing ones using mathematical operations.
     - Encode categorical variables using various techniques (One-Hot, Label, Ordinal, Frequency).
     - Scale numerical features to a standard range (StandardScaler, MinMaxScaler).
+- **End-to-End Modeling Pipeline:**
+    - Train multiple classification or regression models simultaneously.
+    - Evaluate models using a comprehensive set of metrics and confusion matrices.
+    - Tune model hyperparameters to improve performance.
+    - View feature importance plots to understand model behavior.
+- **Project Management:**
+    - Save and load entire project sessions, including data and all operations performed.
+    - Manage and delete saved projects.
 - **Scalable Architecture:** The backend is built to handle large datasets by storing them on the server's filesystem, avoiding browser limitations.
 
 ## Getting Started
@@ -58,6 +66,10 @@ flask run
 ```
 
 The application will start, and you can access it by navigating to `http://127.0.0.1:5000` in your web browser.
+
+### Deployment
+
+For instructions on how to deploy this application to a live web server, please see the [Deployment Guide](DEPLOYMENT.md).
 
 ## Application Structure
 
