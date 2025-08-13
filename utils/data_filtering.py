@@ -29,35 +29,36 @@ def filter_dataframe(df, column, operator, value):
     if column not in df_filtered.columns:
         return df, f"Error: Column '{column}' not found."
 
+    supported_operators = ['>', '<', '==', '!=', '>=', '<=']
+    if operator not in supported_operators:
+        return df, f"Error: Invalid operator '{operator}'. Supported operators are {supported_operators}."
+
     try:
-        # Attempt to convert value to the column's type
-        col_type = df_filtered[column].dtype
-        converted_value = pd.Series([value]).astype(col_type).iloc[0]
-
-        if operator == '>':
-            df_filtered = df_filtered[df_filtered[column] > converted_value]
-        elif operator == '<':
-            df_filtered = df_filtered[df_filtered[column] < converted_value]
-        elif operator == '==':
-            df_filtered = df_filtered[df_filtered[column] == converted_value]
-        elif operator == '!=':
-            df_filtered = df_filtered[df_filtered[column] != converted_value]
-        elif operator == '>=':
-            df_filtered = df_filtered[df_filtered[column] >= converted_value]
-        elif operator == '<=':
-            df_filtered = df_filtered[df_filtered[column] <= converted_value]
-        elif operator == 'contains':
-            if pd.api.types.is_string_dtype(col_type):
-                 df_filtered = df_filtered[df_filtered[column].str.contains(str(converted_value), case=False, na=False)]
-            else:
-                error_message = "Error: 'contains' operator only works on text columns."
+        # Attempt to convert value to the column's data type
+        col_dtype = df_filtered[column].dtype
+        if pd.api.types.is_numeric_dtype(col_dtype):
+            typed_value = float(value)
         else:
-            error_message = "Error: Invalid operator specified."
+            typed_value = value
 
-    except Exception as e:
-        error_message = f"Error applying filter: {e}"
+        # Apply the filter
+        if operator == '>':
+            df_filtered = df_filtered[df_filtered[column] > typed_value]
+        elif operator == '<':
+            df_filtered = df_filtered[df_filtered[column] < typed_value]
+        elif operator == '==':
+            df_filtered = df_filtered[df_filtered[column] == typed_value]
+        elif operator == '!=':
+            df_filtered = df_filtered[df_filtered[column] != typed_value]
+        elif operator == '>=':
+            df_filtered = df_filtered[df_filtered[column] >= typed_value]
+        elif operator == '<=':
+            df_filtered = df_filtered[df_filtered[column] <= typed_value]
 
-    if error_message:
+        return df_filtered, None
+    except (ValueError, TypeError) as e:
+        error_message = f"Error: Could not convert filter value '{value}' to match column '{column}' type. {e}"
         return df, error_message
-
-    return df_filtered, None
+    except Exception as e:
+        error_message = f"An unexpected error occurred during filtering: {e}"
+        return df, error_message
