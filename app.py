@@ -4,6 +4,7 @@ import os
 import uuid
 import json
 import shutil
+import io
 from flask import Flask, render_template, request, redirect, url_for, session, send_file, flash
 from werkzeug.utils import secure_filename
 import pandas as pd
@@ -19,6 +20,8 @@ from utils.data_engineering import create_new_feature, apply_encoding, bin_colum
 from utils.eda import generate_univariate_plot, generate_bivariate_plot
 from utils.modeling import run_models
 from utils.data_export import export_dataframe
+# Import the new function for data combining
+from utils.data_combining import combine_dataframes
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'  # Change this to a secure, random key in production
@@ -271,6 +274,60 @@ def data_filtering():
     columns = df.columns.tolist()
     
     return render_template('data_filtering.html', columns=columns, filtered_df=filtered_df_html)
+
+@app.route('/data_combining', methods=['GET', 'POST'])
+def data_combining():
+    # Placeholder for multiple dataframes
+    if 'dataframes' not in session:
+        session['dataframes'] = {}
+
+    df_names = list(session['dataframes'].keys())
+    combined_df = None
+    error = None
+
+    if request.method == 'POST':
+        left_df_name = request.form.get('left_df')
+        right_df_name = request.form.get('right_df')
+        method = request.form.get('method')
+        
+        left_df_json = session['dataframes'].get(left_df_name)
+        right_df_json = session['dataframes'].get(right_df_name)
+
+        if not left_df_json or not right_df_json:
+            error = "Both DataFrames must be selected."
+        else:
+            left_df = pd.DataFrame(json.loads(left_df_json))
+            right_df = pd.DataFrame(json.loads(right_df_json))
+            
+            kwargs = {}
+            if method == 'merge':
+                kwargs['on'] = request.form.get('on')
+                kwargs['how'] = request.form.get('how')
+            elif method == 'concat':
+                kwargs['axis'] = int(request.form.get('axis'))
+
+            result_df, combine_error = combine_dataframes(left_df, right_df, method, **kwargs)
+
+            if combine_error:
+                error = combine_error
+            else:
+                new_df_name = f"{left_df_name}_{right_df_name}_combined"
+                session['dataframes'][new_df_name] = result_df.to_json(orient='split')
+                save_df_to_session(result_df)
+                combined_df = generate_df_viewer(result_df, num_rows=10)
+                flash(f"DataFrames combined successfully! New DataFrame '{new_df_name}' created.", 'success')
+                return redirect(url_for('data_combining'))
+
+    # Update columns for the merge_on dropdown
+    columns = []
+    if 'current_df' in session:
+        try:
+            current_df = pd.DataFrame(json.loads(session['current_df']))
+            columns = current_df.columns.tolist()
+        except:
+            pass
+
+    return render_template('data_combining.html', dataframes=df_names, combined_df=combined_df, error=error, columns=columns)
 
 @app.route('/model_building', methods=['GET', 'POST'])
 def model_building():
