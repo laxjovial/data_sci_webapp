@@ -44,73 +44,57 @@ def _convert_gdrive_url(url):
 
 def load_data(source_type, source_path_or_file):
     """
-    Loads a dataset from various sources (URL, local file upload) into a DataFrame.
-    
-    Technical: This function acts as the primary data ingestion point. It uses 
-    conditional logic to determine the data source type. For URLs, it first 
-    converts them to a direct-download format if they're from GitHub or Google 
-    Drive before making an HTTP request. For file uploads, it reads the file-like
-    object provided by Flask and uses pandas to parse it based on file extension.
+    Loads a dataset from a file path or URL.
 
-    Layman: This is the app's "waiter." You tell it where your data is—a web link
-    or a file on your computer—and it goes and fetches it for you, making sure
-    it's in the right format for the rest of the app to use.
+    Technical: The function handles different sources. For 'upload', it reads
+    the file from a local path. For 'url', it makes an HTTP GET request,
+    then uses pandas' read_csv() to parse the content directly from a
+    text stream.
+
+    Layman: This is the "open file" button for your application. It can
+    read data from a file you've uploaded or a link you've provided.
 
     Args:
-        source_type (str): The type of data source ('url', 'upload').
-        source_path_or_file (str or werkzeug.FileStorage): The URL string or the uploaded file object.
+        source_type (str): The source of the data ('upload', 'url').
+        source_path_or_file (str): The local file path or the URL to the data.
 
     Returns:
-        tuple: A pandas DataFrame and an error message (if any).
+        tuple: A tuple containing the loaded DataFrame and an error message (if any).
     """
     df = None
-    error_message = None
-    try:
-        if source_type == 'url':
-            # Handle GitHub raw links
-            if 'github.com' in source_path_or_file:
-                source_path_or_file = source_path_or_file.replace(
-                    'github.com', 'raw.githubusercontent.com').replace(
-                    '/blob/', '/')
-            # Handle Google Drive URLs
-            elif 'drive.google.com' in source_path_or_file:
-                source_path_or_file = _convert_gdrive_url(source_path_or_file)
+    error = None
 
-            response = requests.get(source_path_or_file)
-            response.raise_for_status() # Raise an exception for bad status codes
+    if source_type == 'upload':
+        try:
+            # Assuming CSV for now, but could be extended to other formats
+            df = pd.read_csv(source_path_or_file)
+        except FileNotFoundError:
+            error = f"Error: File not found at {source_path_or_file}."
+        except Exception as e:
+            error = f"Error reading file: {e}"
             
-            content = io.StringIO(response.text)
+    elif source_type == 'url':
+        url = _convert_gdrive_url(source_path_or_file)
+        try:
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
             
-            # Infer file type from URL or content
-            file_extension = os.path.splitext(urllib.parse.urlparse(source_path_or_file).path)[1]
-            if file_extension == '.csv' or response.headers['content-type'] == 'text/csv':
-                df = pd.read_csv(content)
-            elif file_extension in ['.xls', '.xlsx']:
-                df = pd.read_excel(io.BytesIO(response.content))
-            elif file_extension == '.json':
-                df = pd.read_json(content)
-            else:
-                error_message = f"Unsupported file type from URL: {file_extension}"
-                return None, error_message
+            # Check if the response content is a zip file
+            if 'zip' in response.headers.get('Content-Type', ''):
+                return None, "Error: The provided URL points to a zip file. Please provide a direct link to a data file like CSV or Excel."
+                
+            file_content = io.StringIO(response.text)
+            # Try to infer the file type, assuming CSV if not specified
+            df = pd.read_csv(file_content)
 
-        elif source_type == 'upload':
-            filename = source_path_or_file.filename
-            if filename.endswith('.csv'):
-                df = pd.read_csv(source_path_or_file)
-            elif filename.endswith(('.xls', '.xlsx')):
-                df = pd.read_excel(source_path_or_file)
-            elif filename.endswith('.json'):
-                df = pd.read_json(source_path_or_file)
-            else:
-                error_message = f"Unsupported file type uploaded: {filename}"
-                return None, error_message
-
-        else:
-            error_message = "Invalid source type specified."
-            return None, error_message
-
-        return df, None
-    except requests.exceptions.RequestException as e:
-        return None, f"Network error during data ingestion: {e}"
-    except Exception as e:
-        return None, f"An error occurred during data ingestion: {e}"
+        except requests.exceptions.RequestException as e:
+            error = f"Error accessing URL: {e}"
+        except pd.errors.ParserError as e:
+            error = f"Error parsing data from URL: {e}. Please ensure the URL points to a valid CSV file."
+        except Exception as e:
+            error = f"An unexpected error occurred: {e}"
+            
+    else:
+        error = f"Error: Invalid source type '{source_type}'."
+        
+    return df, error
