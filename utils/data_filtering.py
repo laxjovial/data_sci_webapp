@@ -20,45 +20,36 @@ def filter_dataframe(df, column, operator, value):
         value (str): The value to compare against.
 
     Returns:
-        pd.DataFrame: The filtered DataFrame.
-        str: An error message, if any.
+        tuple: A tuple containing the filtered DataFrame and an error message (if any).
     """
-    df_filtered = df.copy()
-    error_message = None
-
-    if column not in df_filtered.columns:
-        return df, f"Error: Column '{column}' not found."
-
-    supported_operators = ['>', '<', '==', '!=', '>=', '<=']
-    if operator not in supported_operators:
-        return df, f"Error: Invalid operator '{operator}'. Supported operators are {supported_operators}."
-
+    if column not in df.columns:
+        return None, f"Error: Column '{column}' not found."
+    
     try:
-        # Attempt to convert value to the column's data type
-        col_dtype = df_filtered[column].dtype
-        if pd.api.types.is_numeric_dtype(col_dtype):
-            typed_value = float(value)
+        # Try to convert the value to the column's data type
+        col_type = df[column].dtype
+        if pd.api.types.is_numeric_dtype(col_type):
+            value = float(value)
+        elif pd.api.types.is_datetime64_any_dtype(col_type):
+            value = pd.to_datetime(value)
         else:
-            typed_value = value
-
-        # Apply the filter
+            value = str(value)
+            
         if operator == '>':
-            df_filtered = df_filtered[df_filtered[column] > typed_value]
+            filtered_df = df[df[column] > value]
         elif operator == '<':
-            df_filtered = df_filtered[df_filtered[column] < typed_value]
+            filtered_df = df[df[column] < value]
         elif operator == '==':
-            df_filtered = df_filtered[df_filtered[column] == typed_value]
+            filtered_df = df[df[column] == value]
         elif operator == '!=':
-            df_filtered = df_filtered[df_filtered[column] != typed_value]
+            filtered_df = df[df[column] != value]
         elif operator == '>=':
-            df_filtered = df_filtered[df_filtered[column] >= typed_value]
+            filtered_df = df[df[column] >= value]
         elif operator == '<=':
-            df_filtered = df_filtered[df_filtered[column] <= typed_value]
-
-        return df_filtered, None
+            filtered_df = df[df[column] <= value]
+        else:
+            return None, f"Error: Invalid operator '{operator}'."
+            
+        return filtered_df, None
     except (ValueError, TypeError) as e:
-        error_message = f"Error: Could not convert filter value '{value}' to match column '{column}' type. {e}"
-        return df, error_message
-    except Exception as e:
-        error_message = f"An unexpected error occurred during filtering: {e}"
-        return df, error_message
+        return None, f"Error: Failed to filter. Check if the value type matches the column type. {e}"
