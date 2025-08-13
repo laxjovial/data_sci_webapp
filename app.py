@@ -20,13 +20,12 @@ from utils.data_engineering import create_new_feature, apply_encoding, bin_colum
 from utils.eda import generate_univariate_plot, generate_bivariate_plot
 from utils.modeling import run_models
 from utils.data_export import export_dataframe
-# Import the new function for data combining
 from utils.data_combining import combine_dataframes
 
 app = Flask(__name__)
-app.secret_key = 'your_secret_key'  # Change this to a secure, random key in production
+# Change this to a secure, random key in production.
+app.secret_key = 'your_secret_key'  
 app.config['UPLOAD_FOLDER'] = 'uploads/'
-# New configuration for storing DataFrames on the server
 app.config['DATA_FOLDER'] = 'data/'
 
 # Ensure the upload and data folders exist
@@ -38,7 +37,6 @@ def load_df_from_session(key='current_df'):
     if key in session and session[key]:
         filepath = session[key]
         try:
-            # Use a more efficient format like Parquet
             df = pd.read_parquet(filepath)
             return df
         except Exception as e:
@@ -49,27 +47,48 @@ def load_df_from_session(key='current_df'):
 def save_df_to_session(df, key='current_df'):
     """Helper function to save a DataFrame to a file and store the path in the session."""
     if df is not None:
-        # Generate a unique filename and save the DataFrame to disk
         filename = f"{uuid.uuid4()}.parquet"
         filepath = os.path.join(app.config['DATA_FOLDER'], filename)
         df.to_parquet(filepath)
         
         # Clean up the old file if it exists
-        if key in session and session[key] and os.path.exists(session[key]):
+        if key in session and os.path.exists(session.get(key, '')):
             os.remove(session[key])
             
-        # Store only the file path in the session
         session[key] = filepath
+
+# CORRECTED FUNCTIONS TO HANDLE PLOT DATA
+def load_plot_from_session(plot_name):
+    """Helper function to load a Plotly figure from a file path stored in the session."""
+    if plot_name in session and session[plot_name]:
+        filepath = session[plot_name]
+        try:
+            with open(filepath, 'r') as f:
+                plot_json = f.read()
+            return plot_json
+        except Exception as e:
+            flash(f"Error loading plot from file: {e}", "danger")
+            return None
+    return None
+
+def save_plot_to_session(fig, plot_name):
+    """Helper function to save a Plotly figure to a file and store the path in the session."""
+    if fig is not None:
+        filename = f"{uuid.uuid4()}_{plot_name}.json"
+        filepath = os.path.join(app.config['DATA_FOLDER'], filename)
+        
+        # Clean up old plot file if it exists
+        if plot_name in session and os.path.exists(session.get(plot_name, '')):
+            os.remove(session[plot_name])
+            
+        fig.write_json(filepath)
+        session[plot_name] = filepath
 
 def generate_df_viewer(df, num_rows=5):
     """Helper function to generate an HTML table for viewing a DataFrame."""
     if df is not None:
         return df.head(num_rows).to_html(classes=['table', 'table-striped', 'table-hover', 'table-responsive'], border=0)
     return None
-
-def save_plot_to_session(plot_data, plot_name):
-    """Helper function to save a Plotly figure to the session as JSON."""
-    session[plot_name] = json.dumps(plot_data, cls=go.utils.PlotlyJSONEncoder)
 
 @app.route('/')
 def index():
@@ -114,7 +133,7 @@ def ingest_url():
 @app.route('/projects')
 def projects():
     # This route would list saved projects, which requires a database or file storage
-    projects = [] # Replace with actual project loading logic
+    projects = [] 
     return render_template('projects.html', projects=projects)
 
 @app.route('/data_cleaning', methods=['GET', 'POST'])
@@ -152,50 +171,79 @@ def data_cleaning():
         else:
             save_df_to_session(new_df)
             flash(f'Data cleaning action "{action}" applied successfully!', 'success')
-        return redirect(url_for('data_cleaning'))
 
     columns = df.columns.tolist()
     data_viewer = generate_df_viewer(df)
-    return render_template('data_cleaning.html', columns=columns, data_viewer=data_viewer)
+    
+    # Check if a plot is available in the session
+    plot_json = load_plot_from_session('current_plot')
+    
+    return render_template('data_cleaning.html', data_viewer=data_viewer, columns=columns, plot_json=plot_json)
 
-@app.route('/data_eda', methods=['GET', 'POST'])
-def data_eda():
+@app.route('/eda_univariate', methods=['GET', 'POST'])
+def eda_univariate():
     df = load_df_from_session()
     if df is None:
         flash('Please ingest data first.', 'warning')
         return redirect(url_for('index'))
-    
-    plot_json = session.get('plot_json', None)
-    
-    if request.method == 'POST':
-        action = request.form.get('action')
-        error = None
-        plot_fig = None
 
-        if action == 'univariate_plot':
-            column = request.form.get('column')
-            plot_type = request.form.get('plot_type')
-            color_col = request.form.get('color') or None
-            plot_fig, error = generate_univariate_plot(df, column, plot_type, color=color_col)
-        elif action == 'bivariate_plot':
-            x_col = request.form.get('x_col')
-            y_col = request.form.get('y_col')
-            plot_type = request.form.get('plot_type')
-            color_col = request.form.get('color') or None
-            plot_fig, error = generate_bivariate_plot(df, x_col, y_col, plot_type, color=color_col)
-
-        if error:
-            flash(error, 'danger')
-            return redirect(url_for('data_eda'))
-        
-        if plot_fig:
-            plot_json = plot_fig.to_json()
-            session['plot_json'] = plot_json
-        
-        return redirect(url_for('data_eda'))
-
+    plot_json = None
     columns = df.columns.tolist()
-    return render_template('data_eda.html', columns=columns, plot_json=plot_json)
+
+    if request.method == 'POST':
+        column = request.form.get('column')
+        plot_type = request.form.get('plot_type', 'histogram')
+        color = request.form.get('color')
+        
+        if column:
+            fig = generate_univariate_plot(df, column, plot_type=plot_type, color=color)
+            if fig:
+                # Save the plot to a file and store the path in the session
+                save_plot_to_session(fig, 'univariate_plot')
+                plot_json = load_plot_from_session('univariate_plot')
+            else:
+                flash('Could not generate plot.', 'danger')
+        else:
+            flash('Please select a column.', 'warning')
+    else:
+        # Load any existing plot on GET request
+        plot_json = load_plot_from_session('univariate_plot')
+
+    data_viewer = generate_df_viewer(df)
+    return render_template('eda_univariate.html', data_viewer=data_viewer, columns=columns, plot_json=plot_json)
+
+@app.route('/eda_bivariate', methods=['GET', 'POST'])
+def eda_bivariate():
+    df = load_df_from_session()
+    if df is None:
+        flash('Please ingest data first.', 'warning')
+        return redirect(url_for('index'))
+
+    plot_json = None
+    columns = df.columns.tolist()
+
+    if request.method == 'POST':
+        x_col = request.form.get('x_col')
+        y_col = request.form.get('y_col')
+        plot_type = request.form.get('plot_type', 'scatter')
+        color = request.form.get('color')
+
+        if x_col and y_col:
+            fig = generate_bivariate_plot(df, x_col, y_col, plot_type, color=color)
+            if fig:
+                # Save the plot to a file and store the path in the session
+                save_plot_to_session(fig, 'bivariate_plot')
+                plot_json = load_plot_from_session('bivariate_plot')
+            else:
+                flash('Could not generate plot.', 'danger')
+        else:
+            flash('Please select two columns.', 'warning')
+    else:
+        # Load any existing plot on GET request
+        plot_json = load_plot_from_session('bivariate_plot')
+    
+    data_viewer = generate_df_viewer(df)
+    return render_template('eda_bivariate.html', data_viewer=data_viewer, columns=columns, plot_json=plot_json)
 
 @app.route('/data_engineering', methods=['GET', 'POST'])
 def data_engineering():
@@ -204,11 +252,13 @@ def data_engineering():
         flash('Please ingest data first.', 'warning')
         return redirect(url_for('index'))
 
+    columns = df.columns.tolist()
+    
     if request.method == 'POST':
         action = request.form.get('action')
         new_df = df.copy()
         error = None
-        
+
         if action == 'create_new_feature':
             col1 = request.form.get('col1')
             col2 = request.form.get('col2')
@@ -216,26 +266,27 @@ def data_engineering():
             new_col_name = request.form.get('new_col_name')
             new_df, error = create_new_feature(new_df, col1, col2, operation, new_col_name)
         elif action == 'apply_encoding':
-            columns = request.form.getlist('columns[]')
+            column = request.form.get('column')
             encoding_type = request.form.get('encoding_type')
-            new_df, error = apply_encoding(new_df, columns, encoding_type)
+            new_df, error = apply_encoding(new_df, column, encoding_type)
         elif action == 'bin_column':
             column = request.form.get('column')
-            num_bins = request.form.get('num_bins')
-            new_col_name = request.form.get('new_col_name')
-            labels = request.form.get('labels')
-            new_df, error = bin_column(new_df, column, int(num_bins), new_col_name, labels.split(',') if labels else None)
-        
+            bins = request.form.get('bins')
+            try:
+                bins = int(bins)
+                new_df, error = bin_column(new_df, column, bins)
+            except (ValueError, TypeError):
+                error = "Bins must be an integer."
+
         if error:
             flash(error, 'danger')
         else:
             save_df_to_session(new_df)
             flash(f'Data engineering action "{action}" applied successfully!', 'success')
-        return redirect(url_for('data_engineering'))
-    
-    columns = df.columns.tolist()
+            return redirect(url_for('data_engineering'))
+
     data_viewer = generate_df_viewer(df)
-    return render_template('data_engineering.html', columns=columns, data_viewer=data_viewer)
+    return render_template('data_engineering.html', data_viewer=data_viewer, columns=columns)
 
 @app.route('/data_aggregation', methods=['GET', 'POST'])
 def data_aggregation():
@@ -243,26 +294,24 @@ def data_aggregation():
     if df is None:
         flash('Please ingest data first.', 'warning')
         return redirect(url_for('index'))
-    
-    aggregated_df = None
+
+    columns = df.columns.tolist()
+
     if request.method == 'POST':
         group_by_cols = request.form.getlist('group_by_cols[]')
         agg_col = request.form.get('agg_col')
-        agg_func = request.form.getlist('agg_func[]')
-        
-        result_df, error = group_by_aggregate(df, group_by_cols, agg_col, agg_func)
-        
+        agg_func = request.form.get('agg_func')
+
+        new_df, error = group_by_aggregate(df, group_by_cols, agg_col, agg_func)
         if error:
             flash(error, 'danger')
         else:
-            aggregated_df = generate_df_viewer(result_df, num_rows=10)
-            session['aggregated_df'] = result_df.to_json(orient='split') # Storing for viewing
-            flash('Aggregation successful!', 'success')
-    
-    columns = df.columns.tolist()
-    agg_functions = ['sum', 'mean', 'count', 'min', 'max'] # Example list of functions
-    
-    return render_template('data_aggregation.html', columns=columns, agg_functions=agg_functions, aggregated_df=aggregated_df)
+            save_df_to_session(new_df)
+            flash('Data aggregated successfully!', 'success')
+            return redirect(url_for('data_aggregation'))
+
+    data_viewer = generate_df_viewer(df)
+    return render_template('data_aggregation.html', data_viewer=data_viewer, columns=columns)
 
 @app.route('/data_filtering', methods=['GET', 'POST'])
 def data_filtering():
@@ -270,150 +319,105 @@ def data_filtering():
     if df is None:
         flash('Please ingest data first.', 'warning')
         return redirect(url_for('index'))
-    
-    filtered_df_html = None
+
+    columns = df.columns.tolist()
+
     if request.method == 'POST':
         column = request.form.get('column')
         operator = request.form.get('operator')
         value = request.form.get('value')
         
         new_df, error = filter_dataframe(df, column, operator, value)
-        
         if error:
             flash(error, 'danger')
         else:
             save_df_to_session(new_df)
-            filtered_df_html = generate_df_viewer(new_df, num_rows=10)
-            flash('Filter applied successfully!', 'success')
-        
-    columns = df.columns.tolist()
-    
-    return render_template('data_filtering.html', columns=columns, filtered_df=filtered_df_html)
+            flash('Data filtered successfully!', 'success')
+            return redirect(url_for('data_filtering'))
+
+    data_viewer = generate_df_viewer(df)
+    return render_template('data_filtering.html', data_viewer=data_viewer, columns=columns)
 
 @app.route('/data_combining', methods=['GET', 'POST'])
 def data_combining():
-    # Load multiple dataframes using the new method
-    df_paths = session.get('dataframes', {})
-    
-    # Placeholder for multiple dataframes
-    if 'dataframes' not in session:
-        session['dataframes'] = {}
-
-    df_names = list(session['dataframes'].keys())
-    combined_df_viewer = None
-    error = None
-
-    if request.method == 'POST':
-        left_df_name = request.form.get('left_df')
-        right_df_name = request.form.get('right_df')
-        method = request.form.get('method')
-        
-        left_df_path = df_paths.get(left_df_name)
-        right_df_path = df_paths.get(right_df_name)
-        
-        if not left_df_path or not right_df_path:
-            error = "Both DataFrames must be selected."
-        else:
-            left_df = pd.read_parquet(left_df_path)
-            right_df = pd.read_parquet(right_df_path)
-            
-            kwargs = {}
-            if method == 'merge':
-                kwargs['on'] = request.form.get('on')
-                kwargs['how'] = request.form.get('how')
-            elif method == 'concat':
-                kwargs['axis'] = int(request.form.get('axis'))
-
-            result_df, combine_error = combine_dataframes(left_df, right_df, method, **kwargs)
-
-            if combine_error:
-                error = combine_error
-            else:
-                new_df_name = f"{left_df_name}_{right_df_name}_combined"
-                # Save the new DataFrame and store its path
-                filename = f"{uuid.uuid4()}.parquet"
-                filepath = os.path.join(app.config['DATA_FOLDER'], filename)
-                result_df.to_parquet(filepath)
-                
-                session['dataframes'][new_df_name] = filepath
-                save_df_to_session(result_df)
-                combined_df_viewer = generate_df_viewer(result_df, num_rows=10)
-                flash(f"DataFrames combined successfully! New DataFrame '{new_df_name}' created.", 'success')
-                return redirect(url_for('data_combining'))
-
-    # Update columns for the merge_on dropdown
-    columns = []
-    current_df = load_df_from_session()
-    if current_df is not None:
-        columns = current_df.columns.tolist()
-
-    return render_template('data_combining.html', dataframes=df_names, combined_df=combined_df_viewer, error=error, columns=columns)
-
-@app.route('/model_building', methods=['GET', 'POST'])
-def model_building():
     df = load_df_from_session()
     if df is None:
         flash('Please ingest data first.', 'warning')
         return redirect(url_for('index'))
     
-    results = session.get('model_results_html', None)
-    feature_importance_plot = session.get('feature_importance_plot', None)
-    confusion_matrix_plot = session.get('confusion_matrix_plot', None)
+    columns = df.columns.tolist()
     
     if request.method == 'POST':
-        action = request.form.get('action')
-        error = None
+        pass # Placeholder for future implementation
+        # flash('This feature is not yet implemented.', 'info')
+        # return redirect(url_for('data_combining'))
         
-        if action == 'run_models':
-            problem_type = request.form.get('problem_type')
-            target = request.form.get('target')
-            features = request.form.getlist('features[]')
-            test_size = float(request.form.get('test_size'))
-            random_state = int(request.form.get('random_state'))
-            
-            model_results, fi_plot, cm_plot, error = run_models(df, problem_type, target, features, test_size, random_state)
-            
-            if error:
-                flash(error, 'danger')
-            else:
-                session['model_results_html'] = model_results.to_html(classes=['table', 'table-striped', 'table-hover'], border=0)
-                save_plot_to_session(fi_plot, 'feature_importance_plot')
-                save_plot_to_session(cm_plot, 'confusion_matrix_plot')
-                flash('Models run successfully!', 'success')
-        
-        return redirect(url_for('model_building'))
-    
-    columns = df.columns.tolist()
-    available_models = ['Logistic Regression', 'Random Forest', 'SVM'] # Example
-    return render_template('model_building.html', columns=columns, available_models=available_models,
-                           results=results, feature_importance_plot=feature_importance_plot,
-                           confusion_matrix_plot=confusion_matrix_plot)
+    data_viewer = generate_df_viewer(df)
+    return render_template('data_combining.html', data_viewer=data_viewer, columns=columns)
 
-@app.route('/export', methods=['GET', 'POST'])
-def export():
+@app.route('/modeling', methods=['GET', 'POST'])
+def modeling():
     df = load_df_from_session()
     if df is None:
-        flash('No data to export.', 'warning')
+        flash('Please ingest data first.', 'warning')
         return redirect(url_for('index'))
     
+    columns = df.columns.tolist()
+    
     if request.method == 'POST':
-        file_format = request.form.get('file_format')
+        target_column = request.form.get('target_column')
+        model_type = request.form.get('model_type')
+        model_name = request.form.get('model_name')
         
-        # The file is saved and returned directly
-        file_content, mime_type = export_dataframe(df, file_format)
-        
-        if file_content:
-            output_filename = f'exported_data_{str(uuid.uuid4())[:8]}.{file_format}'
-            return send_file(io.BytesIO(file_content), as_attachment=True, mimetype=mime_type, download_name=output_filename)
+        # Call the modeling function
+        report = run_models(df, target_column, model_type, model_name)
+        if report:
+            session['modeling_report'] = report
+            return redirect(url_for('modeling_results'))
         else:
-            flash(mime_type, 'danger')
-            return redirect(url_for('export'))
-        
-    return render_template('export.html')
+            flash('Failed to run model.', 'danger')
 
-@app.route('/user_guide')
-def user_guide():
-    return render_template('user_guide.html')
+    return render_template('modeling.html', columns=columns)
+
+@app.route('/modeling_results')
+def modeling_results():
+    if 'modeling_report' in session:
+        report = session.get('modeling_report')
+        # Here we just pass the report directly.
+        # In a real app, you might want to save and load it like the df and plots
+        return render_template('modeling_results.html', report=report)
+    else:
+        flash('No modeling report found.', 'warning')
+        return redirect(url_for('modeling'))
+
+@app.route('/download/<file_format>', methods=['GET'])
+def download(file_format):
+    df = load_df_from_session()
+    if df is None:
+        flash('No data to download.', 'danger')
+        return redirect(url_for('index'))
+
+    data, error = export_dataframe(df, file_format)
+    if error:
+        flash(error, 'danger')
+        return redirect(url_for('index'))
+    
+    if file_format == 'csv':
+        mimetype = 'text/csv'
+        filename = 'data.csv'
+    elif file_format == 'excel':
+        mimetype = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        filename = 'data.xlsx'
+    else:
+        flash('Invalid file format.', 'danger')
+        return redirect(url_for('index'))
+    
+    return send_file(
+        io.BytesIO(data),
+        mimetype=mimetype,
+        as_attachment=True,
+        download_name=filename
+    )
 
 if __name__ == '__main__':
     app.run(debug=True)
