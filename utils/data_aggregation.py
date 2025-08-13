@@ -20,33 +20,26 @@ def group_by_aggregate(df, group_by_cols, agg_col, agg_func):
 
     Returns:
         pd.DataFrame: The aggregated DataFrame.
-        str: An error message, if any.
+        str: An error message if the operation fails, otherwise None.
     """
-    error_message = None
-    try:
-        # Check if group by columns exist
-        if not all(col in df.columns for col in group_by_cols):
-            return None, "Error: One or more group by columns not found in DataFrame."
+    if not isinstance(df, pd.DataFrame):
+        return None, "Error: Invalid input DataFrame."
+    if not all(col in df.columns for col in group_by_cols):
+        return None, "Error: One or more group by columns not found."
+    if agg_col not in df.columns:
+        return None, f"Error: Aggregation column '{agg_col}' not found."
 
-        # Check if aggregation column exists
-        if agg_col not in df.columns:
-            return None, f"Error: Aggregation column '{agg_col}' not found in DataFrame."
-            
-        # Check if aggregation is numeric for a non-numeric column
-        numeric_agg_funcs = ['mean', 'median', 'std', 'var', 'sum']
-        if agg_func in numeric_agg_funcs and not pd.api.types.is_numeric_dtype(df[agg_col]):
-            error_message = f"Error: Aggregation function '{agg_func}' can only be applied to numeric columns. Column '{agg_col}' is not numeric."
-            return None, error_message
-        
-        if isinstance(agg_func, str):
+    try:
+        if agg_func in ['mean', 'median', 'sum', 'std']:
+            # Check if the column is numeric before performing numeric aggregation
+            if not pd.api.types.is_numeric_dtype(df[agg_col]):
+                return None, f"Error: Cannot apply '{agg_func}' on non-numeric column '{agg_col}'."
             aggregated_df = df.groupby(group_by_cols)[agg_col].agg(agg_func).reset_index()
-        elif isinstance(agg_func, list):
-            aggregated_df = df.groupby(group_by_cols)[agg_col].agg(agg_func).reset_index()
-            aggregated_df.columns = ['_'.join(col).strip() if isinstance(col, tuple) else col for col in aggregated_df.columns.values]
+        elif agg_func in ['count', 'size']:
+            aggregated_df = df.groupby(group_by_cols).size().reset_index(name='count')
         else:
-            return None, "Error: agg_func must be a string or a list of strings."
-        
+            return None, f"Error: Invalid aggregation function '{agg_func}'."
+
         return aggregated_df, None
     except Exception as e:
-        error_message = f"An error occurred during data aggregation: {e}"
-        return None, error_message
+        return None, f"An unexpected error occurred during aggregation: {e}"
