@@ -22,9 +22,12 @@ def handle_missing_values(df, columns, strategy):
         strategy (str): The imputation strategy ('mean', 'median', 'mode', 'drop').
 
     Returns:
-        pd.DataFrame: The DataFrame with missing values handled.
+        tuple: A tuple containing the new DataFrame and an error message (if any).
     """
     df_cleaned = df.copy()
+    if not all(col in df_cleaned.columns for col in columns):
+        return None, "Error: One or more specified columns do not exist."
+    
     if strategy == 'drop':
         df_cleaned = df_cleaned.dropna(subset=columns)
     else:
@@ -36,7 +39,10 @@ def handle_missing_values(df, columns, strategy):
                     df_cleaned[col] = df_cleaned[col].fillna(df_cleaned[col].median())
             elif strategy == 'mode':
                 df_cleaned[col] = df_cleaned[col].fillna(df_cleaned[col].mode()[0])
-    return df_cleaned
+            else:
+                return None, f"Error: Invalid strategy '{strategy}' for column '{col}'."
+                
+    return df_cleaned, None
 
 def rename_column(df, old_col, new_col):
     """
@@ -45,92 +51,104 @@ def rename_column(df, old_col, new_col):
     Technical: Uses the pandas.DataFrame.rename method with a dictionary mapping.
     This returns a new DataFrame with the column renamed.
 
-    Layman: This simply changes the name of a column to whatever you want.
-
+    Layman: This simply changes the name of a column in your dataset.
+    
     Args:
         df (pd.DataFrame): The input DataFrame.
         old_col (str): The current name of the column.
         new_col (str): The new name for the column.
 
     Returns:
-        pd.DataFrame: The DataFrame with the column renamed.
+        tuple: A tuple containing the new DataFrame and an error message (if any).
     """
-    if old_col in df.columns and new_col:
-        return df.rename(columns={old_col: new_col})
-    return df
+    df_renamed = df.copy()
+    if old_col not in df_renamed.columns:
+        return None, f"Error: Column '{old_col}' not found."
+    df_renamed = df_renamed.rename(columns={old_col: new_col})
+    return df_renamed, None
 
 def convert_dtype(df, column, new_type):
     """
-    Converts a column's data type.
+    Converts a column to a new data type.
 
-    Technical: Utilizes pandas' astype() method. For datetime conversion, it
-    calls pd.to_datetime() with errors='coerce' to handle parsing issues,
-    converting invalid dates to 'NaT' (Not a Time).
+    Technical: Utilizes pandas' astype() method to cast a column to a different
+    data type. It includes error handling to manage cases where the conversion
+    is not possible.
 
-    Layman: This changes the type of information in a column, for example,
-    from text to a number, or from a general text format to a specific date format.
-
+    Layman: This changes the type of data in a column, for example, from text
+    to a number. This is important when you want to perform calculations
+    on a column that is currently saved as text.
+    
     Args:
         df (pd.DataFrame): The input DataFrame.
         column (str): The name of the column to convert.
-        new_type (str): The target data type ('int', 'float', 'str', 'datetime').
+        new_type (str): The new data type ('int', 'float', 'str', 'datetime').
 
     Returns:
-        pd.DataFrame: The DataFrame with the column type converted.
-        str: An error message if conversion fails, otherwise None.
+        tuple: A tuple containing the new DataFrame and an error message (if any).
     """
-    df_cleaned = df.copy()
-    error_message = None
+    df_converted = df.copy()
+    if column not in df_converted.columns:
+        return None, f"Error: Column '{column}' not found."
+    
     try:
         if new_type == 'datetime':
-            df_cleaned[column] = pd.to_datetime(df_cleaned[column], errors='coerce')
+            df_converted[column] = pd.to_datetime(df_converted[column], errors='coerce')
+            if df_converted[column].isnull().any():
+                return None, "Error: Could not convert all values to datetime."
         else:
-            df_cleaned[column] = df_cleaned[column].astype(new_type)
+            df_converted[column] = df_converted[column].astype(new_type)
     except (ValueError, TypeError) as e:
-        error_message = f"Error converting column '{column}' to type '{new_type}': {e}"
-        df_cleaned = df.copy() # Revert changes on error
-    except Exception as e:
-        error_message = f"An unexpected error occurred during conversion: {e}"
-        df_cleaned = df.copy()
-    return df_cleaned, error_message
+        return None, f"Error converting column '{column}' to type '{new_type}': {e}"
+        
+    return df_converted, None
 
 def remove_duplicates(df):
     """
     Removes duplicate rows from the DataFrame.
 
-    Technical: Uses the pandas.DataFrame.drop_duplicates method. By default, it
-    removes all rows that are exact duplicates, keeping only the first occurrence.
+    Technical: Uses the pandas.DataFrame.drop_duplicates() method. This operation
+    identifies and removes rows that have identical values across all columns.
 
-    Layman: This will find and remove any rows in your data that are identical
-    to another row, so you don't have the same information twice.
+    Layman: This function helps clean up your data by deleting any exact copies
+    of rows, ensuring that each piece of information is unique.
 
     Args:
         df (pd.DataFrame): The input DataFrame.
 
     Returns:
-        pd.DataFrame: The DataFrame with duplicates removed.
+        tuple: A tuple containing the new DataFrame and an error message (if any).
     """
-    return df.drop_duplicates()
+    df_cleaned = df.copy()
+    df_cleaned.drop_duplicates(inplace=True)
+    return df_cleaned, None
 
 def standardize_text(df, columns):
     """
-    Standardizes text data in specified columns.
+    Standardizes text in specified columns by converting to lowercase,
+    stripping whitespace, and handling common patterns.
+    
+    Technical: This function applies a series of string manipulation methods
+    (str.lower(), str.strip()) to the specified columns. It's a key part
+    of preparing text data for natural language processing (NLP) or
+    simple comparison.
 
-    Technical: Iterates through the specified columns and applies string methods to trim whitespace,
-    convert to lowercase, and handle null values gracefully.
-
-    Layman: This makes all the text in a column look the same. For example, it will change
-    " NEW YORK " and "New York" to "new york", so the app sees them as the same thing.
+    Layman: This function cleans up text. It makes sure that all the text
+    in a column is consistent, for example, by making everything lowercase
+    and removing extra spaces. This prevents errors when you're trying to
+    group or count text data.
 
     Args:
         df (pd.DataFrame): The input DataFrame.
-        columns (list): A list of column names to standardize.
-
+        columns (list): A list of column names containing text data.
+        
     Returns:
-        pd.DataFrame: The DataFrame with text data standardized.
+        tuple: A tuple containing the new DataFrame and an error message (if any).
     """
     df_cleaned = df.copy()
     for col in columns:
+        if col not in df_cleaned.columns:
+            return None, f"Error: Column '{col}' not found."
         if pd.api.types.is_string_dtype(df_cleaned[col]):
-            df_cleaned[col] = df_cleaned[col].str.strip().str.lower()
-    return df_cleaned
+            df_cleaned[col] = df_cleaned[col].str.lower().str.strip()
+    return df_cleaned, None
