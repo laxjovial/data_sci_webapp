@@ -2,14 +2,11 @@ import pandas as pd
 import plotly.express as px
 import plotly.io as pio
 
-
 def generate_univariate_plot(df, column, color=None):
-
     """
     Generates a univariate plot for a given column.
     - Histogram for numeric data.
     - Bar chart (countplot) for categorical data.
-
     Can be color-coded by another column.
     """
     title = f'Distribution of {column}'
@@ -26,19 +23,15 @@ def generate_univariate_plot(df, column, color=None):
             fig = px.bar(data, x=column, y='count', color=color, title=title, barmode='group')
         else:
             fig = px.bar(df[column].value_counts(), title=title)
-
         fig.update_layout(xaxis_title=column, yaxis_title='Count')
 
     return pio.to_json(fig)
 
-
 def generate_bivariate_plot(df, x_col, y_col, color=None):
-
     """
     Generates a bivariate plot for two given columns.
     - Scatter plot for two numeric columns.
     - Box plot for one numeric and one categorical column.
-
     - Heatmap for two categorical columns (color is ignored).
     Can be color-coded by another column.
     """
@@ -54,12 +47,10 @@ def generate_bivariate_plot(df, x_col, y_col, color=None):
         fig = px.box(df, x=x_col, y=y_col, color=color, title=title)
     else:
         # For two categorical columns, create a crosstab and then a heatmap. Color is ignored.
-
         crosstab = pd.crosstab(df[x_col], df[y_col])
         fig = px.imshow(crosstab, title=f'Heatmap of {x_col} vs. {y_col}', text_auto=True)
 
     return pio.to_json(fig)
-
 
 def generate_multivariate_plot(df, columns, color=None):
     """
@@ -80,7 +71,6 @@ def generate_multivariate_plot(df, columns, color=None):
                         labels=dict(color="Correlation"))
     # Fallback to a simple pair plot
     else:
-
         fig = px.scatter_matrix(df[columns], title='Pair Plot')
 
     return pio.to_json(fig)

@@ -72,24 +72,26 @@ def run_models(df, features, target, problem_type, test_size=0.3, random_state=4
         model.fit(X_train, y_train)
         y_pred = model.predict(X_test)
 
+        metrics = {"Model": name}
         if problem_type == "Classification":
             y_prob = model.predict_proba(X_test)[:, 1] if hasattr(model, "predict_proba") else None
-            metrics = {
-                "Model": name,
+            metrics.update({
                 "Accuracy": accuracy_score(y_test, y_pred),
                 "Precision": precision_score(y_test, y_pred, average='weighted'),
                 "Recall": recall_score(y_test, y_pred, average='weighted'),
                 "F1-Score": f1_score(y_test, y_pred, average='weighted'),
                 "ROC AUC": roc_auc_score(y_test, y_prob) if y_prob is not None else "N/A",
                 "Confusion Matrix": create_confusion_matrix_plot(y_test, y_pred, model.classes_)
-            }
+            })
         else: # Regression
-            metrics = {
-                "Model": name,
+            metrics.update({
                 "R-squared": r2_score(y_test, y_pred),
                 "Mean Squared Error (MSE)": mean_squared_error(y_test, y_pred),
                 "Mean Absolute Error (MAE)": mean_absolute_error(y_test, y_pred),
-            }
+            })
+
+        # Add feature importance plot for all models
+        metrics["Feature Importance"] = generate_feature_importance_plot(model, features)
         results.append(metrics)
 
     return pd.DataFrame(results)
@@ -110,6 +112,26 @@ def create_confusion_matrix_plot(y_true, y_pred, labels):
     fig.update_layout(title_text='Confusion Matrix')
     return fig.to_json()
 
+def generate_feature_importance_plot(model, feature_names):
+    """
+    Generates a Plotly feature importance plot for a given trained model.
+    """
+    importances = None
+    if hasattr(model, 'feature_importances_'):
+        importances = model.feature_importances_
+    elif hasattr(model, 'coef_'):
+        # For linear models, use the coefficients
+        importances = np.abs(model.coef_[0])
+
+    if importances is None:
+        return None
+
+    importance_df = pd.DataFrame({'feature': feature_names, 'importance': importances})
+    importance_df = importance_df.sort_values(by='importance', ascending=True)
+
+    fig = px.bar(importance_df, x='importance', y='feature', orientation='h', title='Feature Importance')
+    fig.update_layout(yaxis_title="Feature", xaxis_title="Importance Score")
+    return fig.to_json()
 
 def get_hyperparameter_grid():
     """
