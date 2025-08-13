@@ -1,73 +1,73 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="row">
-    <div class="col-md-12">
+<div class="row justify-content-center">
+    <div class="col-md-10 text-center">
         <div class="card shadow-sm">
-            <div class="card-header bg-primary text-white">
-                <h4>Phase 1: Data Ingestion</h4>
-                <p class="mb-0">
-                    <span class="fw-bold">Technical:</span> This module provides a flexible interface for loading
-                    data from various sources, including remote URLs (GitHub, Google Drive) and local file
-                    uploads. It supports common formats like CSV and Excel.
-                    <br>
-                    <span class="fw-bold">Layman:</span> This is the starting point of our project. You'll either
-                    paste a link to your dataset or upload a file from your computer. Once the data is loaded,
-                    we'll move on to the next phase.
-                </p>
-            </div>
-            <div class="card-body">
+            <div class="card-body p-5">
+                <h1 class="card-title">Welcome to the Data Science Pipeline</h1>
+                <p class="lead">Your one-stop tool for data analysis and machine learning.</p>
+                <hr class="my-4">
+
                 {% if error %}
                 <div class="alert alert-danger" role="alert">
                     {{ error }}
                 </div>
                 {% endif %}
 
-                <ul class="nav nav-tabs" id="ingestionTab" role="tablist">
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link active" id="url-tab" data-bs-toggle="tab" data-bs-target="#url" type="button" role="tab" aria-controls="url" aria-selected="true">Load from URL</button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="upload-tab" data-bs-toggle="tab" data-bs-target="#upload" type="button" role="tab" aria-controls="upload" aria-selected="false">Upload a File</button>
-                    </li>
-                </ul>
-                <div class="tab-content" id="ingestionTabContent">
-                    <div class="tab-pane fade show active" id="url" role="tabpanel" aria-labelledby="url-tab">
-                        <form action="{{ url_for('index') }}" method="post" class="mt-3">
-                            <input type="hidden" name="source_type" value="url">
-                            <div class="mb-3">
-                                <label for="url-input" class="form-label">Dataset URL</label>
-                                <input type="url" class="form-control" id="url-input" name="url" placeholder="Paste a link to a CSV or Excel file" required>
-                                <div class="form-text">
-                                    <p class="mb-0">
-                                        **Supported Links:**
-                                    </p>
-                                    <ul>
-                                        <li>Raw GitHub URLs (e.g., `https://raw.githubusercontent.com/...`)</li>
-                                        <li>Standard GitHub links (auto-converted to raw)</li>
-                                        <li>Google Drive shared links for Sheets or CSV/XLSX files</li>
-                                    </ul>
-                                </div>
+                <div class="row">
+                    <!-- Create New Project -->
+                    <div class="col-md-6 border-end">
+                        <h4 class="mb-3">Start a New Project</h4>
+                        <p>Upload a new dataset from your device or a URL to begin the analysis pipeline.</p>
+                        <form action="{{ url_for('index') }}" method="post" enctype="multipart/form-data">
+                            <input type="hidden" name="action" value="create_project">
+                             <div class="mb-3">
+                                <label for="source_type_select" class="form-label fw-bold">Data Source:</label>
+                                <select class="form-select" id="source_type_select" name="source_type">
+                                    <option value="upload" selected>Upload from Device</option>
+                                    <option value="url">From a Web Link (URL)</option>
+                                </select>
                             </div>
-                            <button type="submit" class="btn btn-primary w-100">Load Dataset</button>
+
+                            <div id="upload_section" class="mb-3">
+                                <input type="file" class="form-control" name="file" accept=".csv, .xls, .xlsx">
+                            </div>
+
+                            <div id="url_section" class="mb-3" style="display: none;">
+                                <input type="url" class="form-control" name="url" placeholder="Paste a link to your data file">
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100">Create New Project</button>
                         </form>
                     </div>
-                    <div class="tab-pane fade" id="upload" role="tabpanel" aria-labelledby="upload-tab">
-                        <form action="{{ url_for('index') }}" method="post" enctype="multipart/form-data" class="mt-3">
-                            <input type="hidden" name="source_type" value="upload">
-                            <div class="mb-3">
-                                <label for="file" class="form-label">Choose a File</label>
-                                <input type="file" class="form-control" id="file" name="file" accept=".csv, .xls, .xlsx">
-                                <div class="form-text">
-                                    Supported formats: .csv, .xlsx, .xls
-                                </div>
-                            </div>
-                            <button type="submit" class="btn btn-primary w-100">Upload Dataset</button>
-                        </form>
+
+                    <!-- Load Existing Project -->
+                    <div class="col-md-6">
+                        <h4 class="mb-3">Load & Manage Projects</h4>
+                        <p>Resume a previous session or manage your saved projects.</p>
+                        <a href="{{ url_for('projects') }}" class="btn btn-success w-100">Go to Projects Page</a>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const sourceSelect = document.getElementById('source_type_select');
+    const uploadSection = document.getElementById('upload_section');
+    const urlSection = document.getElementById('url_section');
+
+    sourceSelect.addEventListener('change', function() {
+        if (this.value === 'upload') {
+            uploadSection.style.display = 'block';
+            urlSection.style.display = 'none';
+        } else {
+            uploadSection.style.display = 'none';
+            urlSection.style.display = 'block';
+        }
+    });
+});
+</script>
 {% endblock %}
