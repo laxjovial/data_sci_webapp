@@ -3,114 +3,129 @@
 {% block content %}
 <div class="row">
     <div class="col-md-12">
-        <div class="card shadow-sm">
-            <div class="card-header bg-purple text-white" style="background-color: #6f42c1;">
-                <h4>Data Combining (Merge, Concat, Join)</h4>
-                <p class="mb-0">Combine your current dataset with a second one.</p>
+        <h2 class="mb-4">Data Combining</h2>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                Combine DataFrames
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('data_combining') }}" method="POST">
+                    <div class="mb-3">
+                        <label for="left_df" class="form-label">First DataFrame</label>
+                        <select class="form-control" id="left_df" name="left_df" required>
+                            <option value="" disabled selected>Select a DataFrame</option>
+                            {% for df_name in dataframes %}
+                                <option value="{{ df_name }}">{{ df_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="right_df" class="form-label">Second DataFrame</label>
+                        <select class="form-control" id="right_df" name="right_df" required>
+                            <option value="" disabled selected>Select a DataFrame</option>
+                            {% for df_name in dataframes %}
+                                <option value="{{ df_name }}">{{ df_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Combination Method</label>
+                        <div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="method" id="methodMerge" value="merge" required>
+                                <label class="form-check-label" for="methodMerge">Merge</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="method" id="methodConcat" value="concat">
+                                <label class="form-check-label" for="methodConcat">Concat</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="method" id="methodJoin" value="join">
+                                <label class="form-check-label" for="methodJoin">Join</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="merge-options" style="display: none;">
+                        <div class="mb-3">
+                            <label for="merge_on" class="form-label">Column to Merge On</label>
+                            <select class="form-control" id="merge_on" name="on">
+                                <option value="" disabled selected>Select a column</option>
+                                {% for column in columns %}
+                                    <option value="{{ column }}">{{ column }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="merge_how" class="form-label">Merge Type</label>
+                            <select class="form-control" id="merge_how" name="how">
+                                <option value="inner">Inner</option>
+                                <option value="outer">Outer</option>
+                                <option value="left">Left</option>
+                                <option value="right">Right</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="concat-options" style="display: none;">
+                        <div class="mb-3">
+                            <label for="concat_axis" class="form-label">Axis</label>
+                            <select class="form-control" id="concat_axis" name="axis">
+                                <option value="0">0 (Rows)</option>
+                                <option value="1">1 (Columns)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary mt-3">Combine Data</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                Combined Data
             </div>
             <div class="card-body">
                 {% if error %}
-                <div class="alert alert-danger" role="alert"><strong>Error:</strong> {{ error }}</div>
+                    <div class="alert alert-danger">{{ error }}</div>
                 {% endif %}
-                {% if success %}
-                <div class="alert alert-success" role="alert"><strong>Success:</strong> {{ success }}</div>
-                {% endif %}
-
-                <!-- Step 1: Left DataFrame Preview -->
-                <h5 class="mb-3">1. Primary (Left) DataFrame</h5>
-                <div class="table-responsive mb-4" style="max-height: 300px;">
-                    {{ left_df_head|safe }}
-                </div>
-                <hr>
-
-                <!-- Step 2: Upload Right DataFrame -->
-                <h5 class="mb-3">2. Upload Second (Right) DataFrame</h5>
-                <form action="{{ url_for('data_combining') }}" method="post" enctype="multipart/form-data" class="border p-3 mb-4">
-                    <input type="hidden" name="action" value="upload_right_df">
-                    <div class="mb-3">
-                        <label for="file_right" class="form-label">Choose a file to combine with:</label>
-                        <input type="file" class="form-control" id="file_right" name="file_right" accept=".csv, .xls, .xlsx" required>
-                    </div>
-                    <button type="submit" class="btn btn-secondary">Upload Second DataFrame</button>
-                </form>
-
-                {% if right_df_head %}
-                <hr>
-                <h5 class="mb-3">Preview of Second (Right) DataFrame</h5>
-                 <div class="table-responsive mb-4" style="max-height: 300px;">
-                    {{ right_df_head|safe }}
-                </div>
-                <hr>
-
-                <!-- Step 3: Configure and Perform Combination -->
-                <h5 class="mb-3">3. Configure Combination</h5>
-                <ul class="nav nav-tabs mb-3" id="pills-tab" role="tablist">
-                    <li class="nav-item" role="presentation"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#pills-merge" type="button">Merge</button></li>
-                    <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#pills-concat" type="button">Concat</button></li>
-                </ul>
-
-                <div class="tab-content border p-3" id="pills-tabContent">
-                    <!-- Merge Form -->
-                    <div class="tab-pane fade show active" id="pills-merge" role="tabpanel">
-                        <form action="{{ url_for('data_combining') }}" method="post">
-                            <input type="hidden" name="action" value="perform_combine">
-                            <input type="hidden" name="method" value="merge">
-                            <p class="form-text">Database-style join. Select columns to match rows on.</p>
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">Key(s) from Left DF:</label>
-                                    <select class="form-select" name="left_on" multiple size="4">
-                                        {% for col in left_cols %}<option value="{{ col }}">{{ col }}</option>{% endfor %}
-                                    </select>
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">Key(s) from Right DF:</label>
-                                    <select class="form-select" name="right_on" multiple size="4">
-                                        {% for col in right_cols %}<option value="{{ col }}">{{ col }}</option>{% endfor %}
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">Join Type (how):</label>
-                                <select class="form-select" name="how">
-                                    <option value="inner">Inner (only matching rows)</option>
-                                    <option value="left">Left (all rows from left, matches from right)</option>
-                                    <option value="right">Right (all rows from right, matches from left)</option>
-                                    <option value="outer">Outer (all rows from both)</option>
-                                </select>
-                            </div>
-                            <button type="submit" class="btn btn-primary">Perform Merge</button>
-                        </form>
-                    </div>
-                    <!-- Concat Form -->
-                    <div class="tab-pane fade" id="pills-concat" role="tabpanel">
-                        <form action="{{ url_for('data_combining') }}" method="post">
-                            <input type="hidden" name="action" value="perform_combine">
-                            <input type="hidden" name="method" value="concat">
-                            <p class="form-text">Stack datasets on top of each other (rows) or side-by-side (columns).</p>
-                             <div class="mb-3">
-                                <label class="form-label">Axis:</label>
-                                <select class="form-select" name="axis">
-                                    <option value="0">Rows (axis=0)</option>
-                                    <option value="1">Columns (axis=1)</option>
-                                </select>
-                            </div>
-                            <button type="submit" class="btn btn-primary">Perform Concat</button>
-                        </form>
-                    </div>
-                </div>
-                {% endif %}
-
-                <!-- Result Preview -->
-                {% if result_df_head %}
-                <hr>
-                <h5 class="mb-3">Result of Combination</h5>
-                <div class="table-responsive">
-                    {{ result_df_head|safe }}
-                </div>
+                {% if combined_df %}
+                    {{ combined_df | safe }}
+                {% else %}
+                    <p>No combined data to display yet. Combine two DataFrames to see results.</p>
                 {% endif %}
             </div>
         </div>
     </div>
 </div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const methodRadios = document.querySelectorAll('input[name="method"]');
+    const mergeOptions = document.getElementById('merge-options');
+    const concatOptions = document.getElementById('concat-options');
+
+    function toggleOptions() {
+        if (document.getElementById('methodMerge').checked) {
+            mergeOptions.style.display = 'block';
+            concatOptions.style.display = 'none';
+        } else if (document.getElementById('methodConcat').checked) {
+            mergeOptions.style.display = 'none';
+            concatOptions.style.display = 'block';
+        } else {
+            mergeOptions.style.display = 'none';
+            concatOptions.style.display = 'none';
+        }
+    }
+
+    methodRadios.forEach(radio => radio.addEventListener('change', toggleOptions));
+    toggleOptions(); // Initial call to set visibility on page load
+});
+</script>
 {% endblock %}
