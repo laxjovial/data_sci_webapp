@@ -2,19 +2,25 @@
 
 import os
 import uuid
+
 from flask import Flask, render_template, request, redirect, url_for, session, send_file
+
 from werkzeug.utils import secure_filename
 from utils.data_ingestion import load_data, get_dataframe_summary
 from utils.data_cleaning import (
     handle_missing_values, rename_column, convert_dtype,
+
     remove_duplicates, standardize_text, handle_outliers, correct_inconsistencies,
     format_date_column
+
 )
 from utils.data_engineering import (
     create_new_feature, apply_encoding, scale_features, rename_and_drop_columns
 )
 from utils.eda import generate_univariate_plot, generate_bivariate_plot, generate_multivariate_plot
+
 from utils.data_export import export_dataframe, export_ipynb
+
 import pandas as pd
 import numpy as np
 import io
@@ -106,7 +112,9 @@ def index():
                 filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
                 session['filepath'] = filepath
                 session['file_ext'] = file_ext
+
                 session['code_log'] = [f"df = pd.read_csv('{filepath}')" if file_ext == '.csv' else f"df = pd.read_excel('{filepath}')"]
+
                 _save_df_to_filepath(df)
                 return redirect(url_for('data_viewer'))
 
@@ -159,7 +167,9 @@ def data_cleaning():
 
             elif action == 'remove_duplicates':
                 df = remove_duplicates(df)
+
                 session['code_log'].append(f"df = df.drop_duplicates()")
+
                 success_message = "Duplicate rows removed."
             
             elif action == 'standardize_text':
@@ -167,7 +177,9 @@ def data_cleaning():
                 case = request.form.get('text_case')
                 df, new_error_message = standardize_text(df, column, case)
                 if new_error_message is None:
+
                     session['code_log'].append(f"df['{column}'] = df['{column}'].str.{case}()")
+
                     success_message = f"Text in '{column}' standardized to '{case}'."
 
             elif action == 'handle_outliers':
@@ -175,7 +187,9 @@ def data_cleaning():
                 method = request.form.get('outlier_method')
                 df, new_error_message = handle_outliers(df, column, method)
                 if new_error_message is None:
+
                     session['code_log'].append(f"# Handling outliers in '{column}' using {method} method (code is complex)")
+
                     success_message = f"Outliers in '{column}' handled using '{method}'."
 
             elif action == 'correct_inconsistencies':
@@ -186,6 +200,7 @@ def data_cleaning():
                     raise ValueError("Input is not a valid dictionary.")
                 df, new_error_message = correct_inconsistencies(df, column, mapping_dict)
                 if new_error_message is None:
+
                     session['code_log'].append(f"df['{column}'] = df['{column}'].replace({mapping_dict})")
                     success_message = f"Inconsistencies in '{column}' corrected."
 
@@ -202,6 +217,7 @@ def data_cleaning():
 
         except Exception as e:
             new_error_message = f"An error occurred: {e}"
+
 
     df_head_html, _, _, columns, _ = get_dataframe_summary(df)
     current_stage, progress_percent = _get_progress_data("Data Cleaning")
@@ -279,8 +295,10 @@ def data_engineering():
                 new_col_name = request.form.get('new_col_name')
                 df, new_error_message = create_new_feature(df, col1, col2, operation, new_col_name)
                 if new_error_message is None:
+
                     op_map = {'add': '+', 'subtract': '-', 'multiply': '*', 'divide': '/'}
                     session['code_log'].append(f"df['{new_col_name}'] = df['{col1}'] {op_map[operation]} df['{col2}']")
+
                     success_message = f"New feature '{new_col_name}' created."
 
             elif action == 'apply_encoding':
@@ -288,7 +306,9 @@ def data_engineering():
                 encoding_type = request.form.get('encoding_type')
                 df, new_error_message = apply_encoding(df, columns, encoding_type)
                 if new_error_message is None:
+
                     session['code_log'].append(f"# Applying {encoding_type} encoding to {columns} (code is complex)")
+
                     success_message = f"Columns encoded using '{encoding_type}'."
 
             elif action == 'scale_features':
@@ -296,7 +316,9 @@ def data_engineering():
                 scaler_type = request.form.get('scaler_type')
                 df, new_error_message = scale_features(df, columns, scaler_type)
                 if new_error_message is None:
+
                     session['code_log'].append(f"# Scaling {columns} using {scaler_type} scaler (code is complex)")
+
                     success_message = f"Columns scaled using '{scaler_type}'."
 
             elif action == 'rename_drop':
@@ -318,6 +340,7 @@ def data_engineering():
     return render_template('data_engineering.html',
                            df_head=df_head_html, columns=columns, error=new_error_message,
                            success=success_message, current_stage=current_stage,
+
                            progress_percent=progress_percent)
 
 
@@ -364,7 +387,16 @@ def export():
     return render_template('export.html',
                            df_head=df_head_html,
                            current_stage=current_stage,
+
                            progress_percent=progress_percent)
+
+
+@app.route('/user_guide')
+def user_guide():
+    """
+    Renders the user guide page.
+    """
+    return render_template('user_guide.html')
 
 
 if __name__ == '__main__':
