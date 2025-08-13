@@ -71,6 +71,43 @@
                         <li><strong>Scale Features:</strong> Standardize the range of your numerical columns so that they are all on a similar scale.</li>
                         <li><strong>Rename/Drop Columns:</strong> Organize your dataset by renaming columns or removing ones you don't need.</li>
                     </ul>
+
+
+                    <hr class="my-4">
+
+                    <h4 class="mt-4">Phase 5 & 6: Model Building & Evaluation</h4>
+                    <p>This is the core of the predictive pipeline. Here you will train machine learning models and see how well they perform.</p>
+                    <ol>
+                        <li><strong>Define Your Goal:</strong>
+                            <ul>
+                                <li>Select the **Problem Type** (Classification or Regression).</li>
+                                <li>Choose the **Target Variable** you want the model to predict.</li>
+                                <li>Set the **Test Set Size** (the percentage of data held back to test the model's performance).</li>
+                            </ul>
+                        </li>
+                        <li><strong>Select Your Tools:</strong>
+                            <ul>
+                                <li>Choose the **Feature Variables** the model should use to make its predictions.</li>
+                                <li>Select one or more **Models** to run. The application will train all the models you select.</li>
+                            </ul>
+                        </li>
+                        <li>Click "Build and Evaluate Models". You will be taken to a results page.</li>
+                        <li>On the results page, you will see a table comparing all the models. For classification tasks, you will also see a confusion matrix for each model.</li>
+                    </ol>
+
+                    <hr class="my-4">
+
+                    <h4 class="mt-4">Phase 7: Model Improvement (Tuning)</h4>
+                    <p>After building your models, you can try to improve the best one by tuning its settings (hyperparameters).</p>
+                    <ol>
+                        <li>On the Model Evaluation Results page, click the "Tune Model" button next to the model you want to improve.</li>
+                        <li>This will take you to the **Hyperparameter Tuning** page.</li>
+                        <li>The page provides a set of common hyperparameters for that model with default values to test.</li>
+                        <li>You can edit these values. Provide comma-separated numbers or text for the settings you want to try.</li>
+                        <li>Click "Run Tuning". The application will use GridSearchCV to find the best combination of settings.</li>
+                        <li>The results, including the best parameters and the performance of the tuned model, will be displayed on the page.</li>
+                    </ol>
+
                 </article>
             </div>
         </div>

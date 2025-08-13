@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-warning text-dark">
+                <h4>Hyperparameter Tuning for: <strong>{{ model_name }}</strong></h4>
+                <p class="mb-0">
+                    <span class="fw-bold">Technical:</span> Use GridSearchCV to find the optimal hyperparameters for the selected model.
+                    <br>
+                    <span class="fw-bold">Layman:</span> Let's fine-tune the model's settings to improve its performance.
+                </p>
+            </div>
+            <div class="card-body">
+                {% if error %}
+                <div class="alert alert-danger" role="alert"><strong>Error:</strong> {{ error }}</div>
+                {% endif %}
+
+                <form action="{{ url_for('model_tuning', model_name=model_name) }}" method="post" class="border p-3 mb-4">
+                    <h5 class="mb-3">Parameter Grid</h5>
+                    <p>Enter comma-separated values for the hyperparameters you want to test. The system will try all combinations.</p>
+
+                    {% if param_grid_options %}
+                        {% for param, values in param_grid_options.items() %}
+                        <div class="mb-3">
+                            <label for="param_{{ param }}" class="form-label"><strong>{{ param }}</strong></label>
+                            <input type="text" class="form-control" name="{{ param }}" id="param_{{ param }}" value="{{ values|join(', ') }}">
+                            <div class="form-text">Default values are provided. Modify them as needed.</div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="alert alert-secondary">No default hyperparameters defined for this model.</div>
+                    {% endif %}
+
+                    <button type="submit" class="btn btn-warning w-100 mt-3">Run Tuning</button>
+                </form>
+
+                {% if tuning_results %}
+                <hr>
+                <h5 class="mb-3">Tuning Results</h5>
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-title">Best Parameters Found:</h6>
+                        <pre><code>{{ tuning_results['Best Parameters'] }}</code></pre>
+                        <hr>
+                        <h6 class="card-title">Performance of Tuned Model:</h6>
+                        <ul>
+                            {% for key, value in tuning_results.items() if key != 'Best Parameters' %}
+                                <li><strong>{{ key }}:</strong> {% if value is number and value is not integer %}{{ "%.4f"|format(value) }}{% else %}{{ value }}{% endif %}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+<hr>
+<a href="{{ url_for('model_building') }}" class="btn btn-secondary">Back to Model Building</a>
+{% endblock %}

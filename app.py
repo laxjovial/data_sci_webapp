@@ -15,7 +15,9 @@ from utils.data_engineering import (
 )
 from utils.data_filtering import filter_dataframe
 from utils.data_aggregation import group_by_aggregate, pivot_table
-from utils.modeling import get_model_list, run_models
+
+from utils.modeling import get_model_list, run_models, get_hyperparameter_grid, tune_model_hyperparameters
+
 from utils.eda import generate_univariate_plot, generate_bivariate_plot, generate_multivariate_plot
 from utils.data_export import export_dataframe, export_ipynb
 import pandas as pd
@@ -465,6 +467,13 @@ def model_building():
             results_table = results_df.drop(columns=['Confusion Matrix'], errors='ignore').to_html(classes=['table', 'table-striped', 'table-sm'])
             results_list = results_df.to_dict(orient='records')
 
+
+            # Save the run configuration for the tuning step
+            session['last_run_features'] = feature_cols
+            session['last_run_target'] = target_col
+            session['last_run_problem_type'] = problem_type
+
+
             return render_template('model_results.html',
                                    results_table=results_table,
                                    results_list=results_list,
@@ -489,6 +498,65 @@ def model_building():
                            models=get_model_list(),
                            current_stage=current_stage,
                            progress_percent=progress_percent)
+
+
+
+@app.route('/model_tuning/<model_name>', methods=['GET', 'POST'])
+def model_tuning(model_name):
+    df, error_message = _get_df_from_filepath()
+    if error_message:
+        return redirect(url_for('index'))
+
+    # This is a simplified way to keep state. In a larger app, you'd pass this via forms.
+    # For now, we assume the last run's settings are what we're tuning.
+    # This part needs the session to be populated from the model_building run,
+    # which we are not doing yet. This will be faked for now.
+    # TODO: Pass features and target from model_building to this route.
+    if 'last_run_features' not in session:
+        # Fallback for now
+        session['last_run_features'] = df.columns.tolist()[:-1]
+        session['last_run_target'] = df.columns.tolist()[-1]
+        session['last_run_problem_type'] = 'Classification' if df[session['last_run_target']].dtype == 'object' else 'Regression'
+
+
+    features = session['last_run_features']
+    target = session['last_run_target']
+    problem_type = session['last_run_problem_type']
+
+    param_grid_options = get_hyperparameter_grid()[problem_type].get(model_name, {})
+    tuning_results = None
+    new_error_message = None
+
+    if request.method == 'POST':
+        try:
+            # Construct param_grid from form
+            param_grid = {}
+            for param, values in param_grid_options.items():
+                user_values = request.form.get(param)
+                if user_values:
+                    # Super basic parsing: split by comma and try to convert to int/float
+                    processed_values = []
+                    for v in user_values.split(','):
+                        v = v.strip()
+                        try:
+                            processed_values.append(float(v) if '.' in v else int(v))
+                        except ValueError:
+                            processed_values.append(v) # Keep as string if conversion fails
+                    param_grid[param] = processed_values
+
+            tuning_results = tune_model_hyperparameters(df, features, target, problem_type, model_name, param_grid)
+        except Exception as e:
+            new_error_message = f"An error occurred during tuning: {e}"
+
+
+    return render_template('model_tuning.html',
+                           model_name=model_name,
+                           param_grid_options=param_grid_options,
+                           tuning_results=tuning_results,
+                           error=new_error_message,
+                           current_stage="Model Improvement",
+                           progress_percent=95)
+
 
 
 @app.route('/user_guide')

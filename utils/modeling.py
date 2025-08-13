@@ -109,3 +109,98 @@ def create_confusion_matrix_plot(y_true, y_pred, labels):
     )
     fig.update_layout(title_text='Confusion Matrix')
     return fig.to_json()
+
+
+def get_hyperparameter_grid():
+    """
+    Returns a dictionary of hyperparameters for tuning each model.
+    This provides a starting point for users.
+    """
+    grids = {
+        "Classification": {
+            "Logistic Regression": {
+                'C': [0.1, 1, 10],
+                'solver': ['liblinear']
+            },
+            "K-Nearest Neighbors": {
+                'n_neighbors': [3, 5, 7],
+                'weights': ['uniform', 'distance']
+            },
+            "Support Vector Machine": {
+                'C': [0.1, 1, 10],
+                'kernel': ['linear', 'rbf']
+            },
+            "Decision Tree": {
+                'max_depth': [None, 10, 20, 30],
+                'min_samples_split': [2, 5, 10]
+            },
+            "Random Forest": {
+                'n_estimators': [100, 200],
+                'max_depth': [None, 10, 20]
+            },
+            "AdaBoost": {
+                'n_estimators': [50, 100],
+                'learning_rate': [0.01, 0.1, 1]
+            },
+            "Gradient Boosting": {
+                'n_estimators': [100, 200],
+                'learning_rate': [0.01, 0.1, 0.2]
+            },
+            "XGBoost": {
+                'n_estimators': [100, 200],
+                'learning_rate': [0.01, 0.1, 0.2],
+                'max_depth': [3, 5, 7]
+            }
+        },
+        "Regression": {
+            # Add regression model grids here if needed
+        }
+    }
+    return grids
+
+def tune_model_hyperparameters(df, features, target, problem_type, model_name, param_grid, test_size=0.3, random_state=42):
+    """
+    Tunes hyperparameters for a single model using GridSearchCV.
+    """
+    from sklearn.model_selection import GridSearchCV
+
+    X = df[features]
+    y = df[target]
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=test_size, random_state=random_state
+    )
+
+    model = get_model_list()[problem_type][model_name]
+
+    # Define scoring metric
+    scoring = 'f1_weighted' if problem_type == "Classification" else 'r2'
+
+    grid_search = GridSearchCV(estimator=model, param_grid=param_grid, cv=3, n_jobs=-1, verbose=2, scoring=scoring)
+    grid_search.fit(X_train, y_train)
+
+    best_params = grid_search.best_params_
+
+    # Evaluate the best model found by grid search on the test set
+    best_model = grid_search.best_estimator_
+    y_pred = best_model.predict(X_test)
+
+    if problem_type == "Classification":
+        y_prob = best_model.predict_proba(X_test)[:, 1] if hasattr(best_model, "predict_proba") else None
+        final_metrics = {
+            "Best Parameters": str(best_params),
+            "CV Score": grid_search.best_score_,
+            "Test Accuracy": accuracy_score(y_test, y_pred),
+            "Test F1-Score": f1_score(y_test, y_pred, average='weighted'),
+            "Test ROC AUC": roc_auc_score(y_test, y_prob) if y_prob is not None else "N/A"
+        }
+    else: # Regression
+        final_metrics = {
+            "Best Parameters": str(best_params),
+            "CV Score (R-squared)": grid_search.best_score_,
+            "Test R-squared": r2_score(y_test, y_pred),
+            "Test MSE": mean_squared_error(y_test, y_pred)
+        }
+
+    return final_metrics
+
