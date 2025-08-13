@@ -15,6 +15,7 @@ from utils.data_engineering import (
 )
 from utils.data_filtering import filter_dataframe
 from utils.data_aggregation import group_by_aggregate, pivot_table
+from utils.modeling import get_model_list, run_models
 from utils.eda import generate_univariate_plot, generate_bivariate_plot, generate_multivariate_plot
 from utils.data_export import export_dataframe, export_ipynb
 import pandas as pd
@@ -435,6 +436,59 @@ def data_aggregation():
                            columns=columns, df=df, result_df_head=result_df_head,
                            error=new_error_message, success=success_message,
                            current_stage=current_stage, progress_percent=progress_percent)
+
+
+@app.route('/model_building', methods=['GET', 'POST'])
+def model_building():
+    df, error_message = _get_df_from_filepath()
+    if error_message:
+        return redirect(url_for('index'))
+
+    if request.method == 'POST':
+        try:
+            target_col = request.form.get('target_col')
+            feature_cols = request.form.getlist('feature_cols')
+            problem_type = request.form.get('problem_type')
+            test_size = float(request.form.get('test_size'))
+
+            # The model checkboxes are disabled in HTML based on problem type,
+            # so we only get the relevant ones.
+            selected_models = request.form.getlist('models')
+
+            if not target_col or not feature_cols or not selected_models:
+                raise ValueError("Missing required fields: target, features, or models.")
+
+            # Run the models
+            results_df = run_models(df, feature_cols, target_col, problem_type, test_size)
+
+            # Prepare results for rendering
+            results_table = results_df.drop(columns=['Confusion Matrix'], errors='ignore').to_html(classes=['table', 'table-striped', 'table-sm'])
+            results_list = results_df.to_dict(orient='records')
+
+            return render_template('model_results.html',
+                                   results_table=results_table,
+                                   results_list=results_list,
+                                   problem_type=problem_type,
+                                   current_stage="Model Evaluation",
+                                   progress_percent=90)
+        except Exception as e:
+            # On error, re-render the model building page with the error message
+            _, _, columns, _ = get_dataframe_summary(df)
+            return render_template('model_building.html',
+                                   columns=columns,
+                                   models=get_model_list(),
+                                   error=f"An error occurred: {e}",
+                                   current_stage="Model Building",
+                                   progress_percent=75)
+
+    # For GET request
+    _, _, columns, _ = get_dataframe_summary(df)
+    current_stage, progress_percent = _get_progress_data("Model Building")
+    return render_template('model_building.html',
+                           columns=columns,
+                           models=get_model_list(),
+                           current_stage=current_stage,
+                           progress_percent=progress_percent)
 
 
 @app.route('/user_guide')
