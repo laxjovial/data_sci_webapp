@@ -3,106 +3,62 @@
 {% block content %}
 <div class="row">
     <div class="col-md-12">
-        <div class="card shadow-sm">
-            <div class="card-header bg-primary text-white">
-                <h4>Data Aggregation & Analysis</h4>
-                <p class="mb-0">
-                    <span class="fw-bold">Technical:</span> This module provides tools for data summarization using `groupby` and `pivot_table` operations.
-                    <br>
-                    <span class="fw-bold">Layman:</span> Use these tools to summarize and analyze your data. Group it into categories or create powerful summary tables.
-                </p>
+        <h2 class="mb-4">Data Aggregation</h2>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                Configure Aggregation
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('data_aggregation') }}" method="POST">
+                    <div class="mb-3">
+                        <label for="group_by_cols" class="form-label">Group By Columns (Select multiple)</label>
+                        <select class="form-control" id="group_by_cols" name="group_by_cols[]" multiple required>
+                            {% for column in columns %}
+                            <option value="{{ column }}">{{ column }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="agg_col" class="form-label">Aggregation Column</label>
+                        <select class="form-control" id="agg_col" name="agg_col" required>
+                            <option value="" disabled selected>Select a column</option>
+                            {% for column in columns %}
+                            <option value="{{ column }}">{{ column }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="agg_func" class="form-label">Aggregation Function (Select multiple)</label>
+                        <select class="form-control" id="agg_func" name="agg_func[]" multiple required>
+                            {% for func in agg_functions %}
+                            <option value="{{ func }}">{{ func }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Run Aggregation</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                Aggregated Data
             </div>
             <div class="card-body">
                 {% if error %}
-                <div class="alert alert-danger" role="alert"><strong>Error:</strong> {{ error }}</div>
+                    <div class="alert alert-danger">{{ error }}</div>
                 {% endif %}
-                {% if success %}
-                <div class="alert alert-success" role="alert"><strong>Success:</strong> {{ success }}</div>
-                {% endif %}
-
-                <!-- Aggregation Actions -->
-                <ul class="nav nav-tabs mb-3" id="pills-tab" role="tablist">
-                    <li class="nav-item" role="presentation"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#pills-groupby" type="button">Group By & Aggregate</button></li>
-                    <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#pills-pivot" type="button">Pivot Table</button></li>
-                </ul>
-
-                <div class="tab-content border p-3" id="pills-tabContent">
-                    <!-- GroupBy Form -->
-                    <div class="tab-pane fade show active" id="pills-groupby" role="tabpanel">
-                        <form action="{{ url_for('data_aggregation') }}" method="post">
-                            <input type="hidden" name="agg_type" value="groupby">
-                            <p class="form-text">Group data by one or more columns and calculate a summary statistic for another column.</p>
-                            <div class="mb-3">
-                                <label class="form-label">Columns to Group By:</label>
-                                <select class="form-select" name="groupby_cols" multiple required size="5">
-                                    {% for col in columns %}<option value="{{ col }}">{{ col }}</option>{% endfor %}
-                                </select>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">Column to Aggregate:</label>
-                                <select class="form-select" name="agg_col" required>
-                                    {% for col in columns %}<option value="{{ col }}">{{ col }}</option>{% endfor %}
-                                </select>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">Aggregation Function:</label>
-                                <select class="form-select" name="agg_func" required>
-                                    <option value="mean">Mean</option>
-                                    <option value="sum">Sum</option>
-                                    <option value="count">Count</option>
-                                    <option value="min">Minimum</option>
-                                    <option value="max">Maximum</option>
-                                    <option value="median">Median</option>
-                                    <option value="std">Standard Deviation</option>
-                                </select>
-                            </div>
-                            <button type="submit" class="btn btn-primary">Run Aggregation</button>
-                        </form>
-                    </div>
-
-                    <!-- Pivot Table Form -->
-                    <div class="tab-pane fade" id="pills-pivot" role="tabpanel">
-                        <form action="{{ url_for('data_aggregation') }}" method="post">
-                            <input type="hidden" name="agg_type" value="pivot">
-                             <p class="form-text">Create a spreadsheet-style pivot table to summarize data across two dimensions.</p>
-                            <div class="mb-3">
-                                <label class="form-label">Index (Rows):</label>
-                                <select class="form-select" name="pivot_index" multiple required size="3">
-                                    {% for col in columns %}<option value="{{ col }}">{{ col }}</option>{% endfor %}
-                                </select>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">Columns:</label>
-                                <select class="form-select" name="pivot_cols" multiple required size="3">
-                                    {% for col in columns %}<option value="{{ col }}">{{ col }}</option>{% endfor %}
-                                </select>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">Values:</label>
-                                <select class="form-select" name="pivot_val" required>
-                                    {% for col in columns %}{% if df[col].dtype in ['int64', 'float64'] %}<option value="{{ col }}">{{ col }}</option>{% endif %}{% endfor %}
-                                </select>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">Aggregation Function:</label>
-                                <select class="form-select" name="pivot_agg" required>
-                                    <option value="mean">Mean</option>
-                                    <option value="sum">Sum</option>
-                                    <option value="count">Count</option>
-                                </select>
-                            </div>
-                            <button type="submit" class="btn btn-primary">Create Pivot Table</button>
-                        </form>
-                    </div>
-                </div>
-
-                <!-- Result Preview -->
-                {% if result_df_head %}
-                <hr>
-                <h5>Aggregation Result</h5>
-                <div class="table-responsive">
-                    {{ result_df_head|safe }}
-                </div>
+                {% if aggregated_df %}
+                    {{ aggregated_df | safe }}
+                {% else %}
+                    <p>No aggregated data to display yet. Run an aggregation to see results.</p>
                 {% endif %}
             </div>
         </div>
