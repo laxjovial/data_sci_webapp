@@ -3,71 +3,66 @@
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-md-10 text-center">
-        <div class="card shadow-sm">
-            <div class="card-body p-5">
-                <h1 class="card-title">Welcome to the Data Science Pipeline</h1>
-                <p class="lead">Your one-stop tool for data analysis and machine learning.</p>
-                <hr class="my-4">
+        <h1 class="display-4 fw-bold">Welcome to the Data Science Pipeline</h1>
+        <p class="lead">Start by ingesting your data from a local file or a web URL to begin the pipeline.</p>
+    </div>
+</div>
 
-                {% if error %}
-                <div class="alert alert-danger" role="alert">
-                    {{ error }}
-                </div>
-                {% endif %}
-
-                <div class="row">
-                    <!-- Create New Project -->
-                    <div class="col-md-6 border-end">
-                        <h4 class="mb-3">Start a New Project</h4>
-                        <p>Upload a new dataset from your device or a URL to begin the analysis pipeline.</p>
-                        <form action="{{ url_for('index') }}" method="post" enctype="multipart/form-data">
-                            <input type="hidden" name="action" value="create_project">
-                             <div class="mb-3">
-                                <label for="source_type_select" class="form-label fw-bold">Data Source:</label>
-                                <select class="form-select" id="source_type_select" name="source_type">
-                                    <option value="upload" selected>Upload from Device</option>
-                                    <option value="url">From a Web Link (URL)</option>
-                                </select>
-                            </div>
-
-                            <div id="upload_section" class="mb-3">
-                                <input type="file" class="form-control" name="file" accept=".csv, .xls, .xlsx">
-                            </div>
-
-                            <div id="url_section" class="mb-3" style="display: none;">
-                                <input type="url" class="form-control" name="url" placeholder="Paste a link to your data file">
-                            </div>
-                            <button type="submit" class="btn btn-primary w-100">Create New Project</button>
-                        </form>
+<div class="row mt-5">
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                Upload a Local File
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('upload_file') }}" method="POST" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="file_upload" class="form-label">Select a file (CSV, Excel, or JSON)</label>
+                        <input class="form-control" type="file" id="file_upload" name="file_upload" required>
                     </div>
+                    <button type="submit" class="btn btn-primary">Upload File</button>
+                </form>
+            </div>
+        </div>
+    </div>
 
-                    <!-- Load Existing Project -->
-                    <div class="col-md-6">
-                        <h4 class="mb-3">Load & Manage Projects</h4>
-                        <p>Resume a previous session or manage your saved projects.</p>
-                        <a href="{{ url_for('projects') }}" class="btn btn-success w-100">Go to Projects Page</a>
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                Ingest from a URL
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('ingest_url') }}" method="POST">
+                    <div class="mb-3">
+                        <label for="url_input" class="form-label">Enter a URL to a CSV, Excel, or JSON file</label>
+                        <input type="url" class="form-control" id="url_input" name="url" placeholder="e.g., https://raw.githubusercontent.com/user/repo/file.csv" required>
                     </div>
-                </div>
+                    <button type="submit" class="btn btn-primary">Ingest Data</button>
+                </form>
             </div>
         </div>
     </div>
 </div>
 
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    const sourceSelect = document.getElementById('source_type_select');
-    const uploadSection = document.getElementById('upload_section');
-    const urlSection = document.getElementById('url_section');
-
-    sourceSelect.addEventListener('change', function() {
-        if (this.value === 'upload') {
-            uploadSection.style.display = 'block';
-            urlSection.style.display = 'none';
-        } else {
-            uploadSection.style.display = 'none';
-            urlSection.style.display = 'block';
-        }
-    });
-});
-</script>
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                Ingested Data Preview
+            </div>
+            <div class="card-body">
+                {% if error %}
+                    <div class="alert alert-danger">{{ error }}</div>
+                {% endif %}
+                {% if data_viewer %}
+                    <div class="table-responsive">
+                        {{ data_viewer|safe }}
+                    </div>
+                {% else %}
+                    <p>No data ingested yet. Please upload a file or provide a URL to see a preview of your data here.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
