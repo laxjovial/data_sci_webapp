@@ -3,112 +3,153 @@
 {% block content %}
 <div class="row">
     <div class="col-md-12">
-        <div class="card shadow-sm">
-            <div class="card-header bg-danger text-white">
-                <h4>Phase 6: Model Building</h4>
-                <p class="mb-0">
-                    <span class="fw-bold">Technical:</span> This module trains and evaluates multiple machine learning models for a specified target and feature set.
-                    <br>
-                    <span class="fw-bold">Layman:</span> This is where the magic happens! We'll teach the computer to make predictions based on your data.
-                </p>
+        <h2 class="mb-4">Model Building, Tuning & Results</h2>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-4 mb-4">
+        <div class="card">
+            <div class="card-header">
+                1. Configure and Run Models
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('model_building') }}" method="POST">
+                    <input type="hidden" name="action" value="run_models">
+                    <div class="mb-3">
+                        <label for="problem_type" class="form-label">Problem Type</label>
+                        <select class="form-control" id="problem_type" name="problem_type" required>
+                            <option value="" disabled selected>Select a type</option>
+                            <option value="Classification">Classification</option>
+                            <option value="Regression">Regression</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="target" class="form-label">Target Column</label>
+                        <select class="form-control" id="target" name="target" required>
+                            <option value="" disabled selected>Select a target</option>
+                            {% for column in columns %}
+                                <option value="{{ column }}">{{ column }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="features" class="form-label">Features (Select multiple)</label>
+                        <select class="form-control" id="features" name="features[]" multiple required>
+                            {% for column in columns %}
+                                <option value="{{ column }}">{{ column }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="test_size" class="form-label">Test Size</label>
+                        <input type="number" class="form-control" id="test_size" name="test_size" value="0.3" step="0.01" min="0.1" max="0.9" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="random_state" class="form-label">Random State</label>
+                        <input type="number" class="form-control" id="random_state" name="random_state" value="42" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Run Models</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4 mb-4">
+        <div class="card">
+            <div class="card-header">
+                2. Tune a Model
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('model_building') }}" method="POST">
+                    <input type="hidden" name="action" value="tune_model">
+                    <div class="mb-3">
+                        <label for="model_to_tune" class="form-label">Select Model to Tune</label>
+                        <select class="form-control" id="model_to_tune" name="model_name" required>
+                            <option value="" disabled selected>Select a model</option>
+                            {% for model in available_models %}
+                                <option value="{{ model }}">{{ model }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="tuning_method" class="form-label">Tuning Method</label>
+                        <select class="form-control" id="tuning_method" name="method" required>
+                            <option value="GridSearch">Grid Search</option>
+                            <option value="RandomizedSearch">Randomized Search</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="param_grid" class="form-label">Parameter Grid (JSON format)</label>
+                        <textarea class="form-control" id="param_grid" name="param_grid" rows="5" placeholder='{"n_estimators": [100, 200], "max_depth": [5, 10]}' required></textarea>
+                        <small class="form-text text-muted">Example: {"n_estimators": [100, 200], "max_depth": [5, 10]}</small>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Run Tuning</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4 mb-4">
+        <div class="card">
+            <div class="card-header">
+                3. Model Results
             </div>
             <div class="card-body">
                 {% if error %}
-                <div class="alert alert-danger" role="alert"><strong>Error:</strong> {{ error }}</div>
+                    <div class="alert alert-danger">{{ error }}</div>
                 {% endif %}
-
-                <form action="{{ url_for('model_building') }}" method="post">
-                    <div class="row">
-                        <!-- Column 1: Target and Problem Type -->
-                        <div class="col-md-6 border-end">
-                            <h5>1. Define Your Goal</h5>
-                            <div class="mb-3">
-                                <label for="problem_type" class="form-label">Problem Type</label>
-                                <select class="form-select" name="problem_type" id="problem_type" required>
-                                    <option value="Classification">Classification (Predict a category)</option>
-                                    <option value="Regression">Regression (Predict a number)</option>
-                                </select>
-                            </div>
-                            <div class="mb-3">
-                                <label for="target_col" class="form-label">Target Variable (What to predict?)</label>
-                                <select class="form-select" name="target_col" id="target_col" required>
-                                    {% for col in columns %}<option value="{{ col }}">{{ col }}</option>{% endfor %}
-                                </select>
-                            </div>
-                             <div class="mb-3">
-                                <label for="test_size" class="form-label">Test Set Size</label>
-                                <input type="range" class="form-range" min="0.1" max="0.5" step="0.05" name="test_size" id="test_size" value="0.3">
-                                <div class="text-center"><span id="test_size_label">0.3</span></div>
-                            </div>
-                        </div>
-
-                        <!-- Column 2: Features and Models -->
-                        <div class="col-md-6">
-                            <h5>2. Select Your Tools</h5>
-                            <div class="mb-3">
-                                <label for="feature_cols" class="form-label">Feature Variables (Used for prediction)</label>
-                                <select class="form-select" name="feature_cols" id="feature_cols" multiple required size="8">
-                                     {% for col in columns %}<option value="{{ col }}">{{ col }}</option>{% endfor %}
-                                </select>
-                                <div class="form-text">Hold Ctrl/Cmd to select multiple. Do not select the target variable.</div>
-                            </div>
-                             <div class="mb-3">
-                                <label class="form-label">Models to Run</label>
-                                <div id="classification_models">
-                                    {% for model_name in models['Classification'] %}
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" name="models" value="{{ model_name }}" id="model_{{ model_name.replace(' ', '_') }}" checked>
-                                        <label class="form-check-label" for="model_{{ model_name.replace(' ', '_') }}">{{ model_name }}</label>
-                                    </div>
-                                    {% endfor %}
-                                </div>
-                                <div id="regression_models" style="display: none;">
-                                    {% for model_name in models['Regression'] %}
-                                     <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" name="models" value="{{ model_name }}" id="model_{{ model_name.replace(' ', '_') }}_reg" checked>
-                                        <label class="form-check-label" for="model_{{ model_name.replace(' ', '_') }}_reg">{{ model_name }}</label>
-                                    </div>
-                                    {% endfor %}
-                                </div>
-                            </div>
-                        </div>
+                {% if results %}
+                    <div class="table-responsive mb-4">
+                        <h4>Model Metrics</h4>
+                        {{ results|safe }}
                     </div>
-                    <hr>
-                    <button type="submit" class="btn btn-danger w-100">Build and Evaluate Models</button>
-                </form>
+                {% else %}
+                    <p>No model results to display yet. Configure and run models to see results here.</p>
+                {% endif %}
             </div>
         </div>
     </div>
 </div>
 
+<div class="row">
+    <div class="col-md-12">
+        {% if feature_importance_plot %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    Feature Importance
+                </div>
+                <div class="card-body">
+                    <div id="feature-importance-plot"></div>
+                </div>
+            </div>
+        {% endif %}
+
+        {% if confusion_matrix_plot %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    Confusion Matrix
+                </div>
+                <div class="card-body">
+                    <div id="confusion-matrix-plot"></div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-    // Test size slider label
-    const testSizeSlider = document.getElementById('test_size');
-    const testSizeLabel = document.getElementById('test_size_label');
-    testSizeSlider.addEventListener('input', function () {
-        testSizeLabel.textContent = this.value;
+    document.addEventListener('DOMContentLoaded', function() {
+        {% if feature_importance_plot %}
+            var fi_plot_data = JSON.parse('{{ feature_importance_plot | safe }}');
+            Plotly.newPlot('feature-importance-plot', fi_plot_data.data, fi_plot_data.layout);
+        {% endif %}
+
+        {% if confusion_matrix_plot %}
+            var cm_plot_data = JSON.parse('{{ confusion_matrix_plot | safe }}');
+            Plotly.newPlot('confusion-matrix-plot', cm_plot_data.data, cm_plot_data.layout);
+        {% endif %}
     });
-
-    // Toggle model list based on problem type
-    const problemTypeSelect = document.getElementById('problem_type');
-    const classModels = document.getElementById('classification_models');
-    const regModels = document.getElementById('regression_models');
-    const allModelCheckboxes = document.querySelectorAll('input[type=checkbox][name=models]');
-
-    problemTypeSelect.addEventListener('change', function() {
-        const isClassification = this.value === 'Classification';
-        classModels.style.display = isClassification ? 'block' : 'none';
-        regModels.style.display = isClassification ? 'none' : 'block';
-
-        // Disable checkboxes that are not relevant to the selected problem type
-        // to prevent them from being submitted with the form.
-        classModels.querySelectorAll('input[type=checkbox]').forEach(cb => cb.disabled = !isClassification);
-        regModels.querySelectorAll('input[type=checkbox]').forEach(cb => cb.disabled = isClassification);
-    });
-
-    // Trigger change event on load to set the initial state
-    problemTypeSelect.dispatchEvent(new Event('change'));
-});
 </script>
 {% endblock %}
