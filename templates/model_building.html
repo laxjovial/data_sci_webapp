@@ -1,155 +1,124 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="row">
-    <div class="col-md-12">
-        <h2 class="mb-4">Model Building, Tuning & Results</h2>
-    </div>
-</div>
-
-<div class="row">
-    <div class="col-md-4 mb-4">
-        <div class="card">
-            <div class="card-header">
-                1. Configure and Run Models
-            </div>
-            <div class="card-body">
-                <form action="{{ url_for('model_building') }}" method="POST">
-                    <input type="hidden" name="action" value="run_models">
-                    <div class="mb-3">
-                        <label for="problem_type" class="form-label">Problem Type</label>
-                        <select class="form-control" id="problem_type" name="problem_type" required>
-                            <option value="" disabled selected>Select a type</option>
-                            <option value="Classification">Classification</option>
-                            <option value="Regression">Regression</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="target" class="form-label">Target Column</label>
-                        <select class="form-control" id="target" name="target" required>
-                            <option value="" disabled selected>Select a target</option>
-                            {% for column in columns %}
-                                <option value="{{ column }}">{{ column }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="features" class="form-label">Features (Select multiple)</label>
-                        <select class="form-control" id="features" name="features[]" multiple required>
-                            {% for column in columns %}
-                                <option value="{{ column }}">{{ column }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="test_size" class="form-label">Test Size</label>
-                        <input type="number" class="form-control" id="test_size" name="test_size" value="0.3" step="0.01" min="0.1" max="0.9" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="random_state" class="form-label">Random State</label>
-                        <input type="number" class="form-control" id="random_state" name="random_state" value="42" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Run Models</button>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-4 mb-4">
-        <div class="card">
-            <div class="card-header">
-                2. Tune a Model
-            </div>
-            <div class="card-body">
-                <form action="{{ url_for('model_building') }}" method="POST">
-                    <input type="hidden" name="action" value="tune_model">
-                    <div class="mb-3">
-                        <label for="model_to_tune" class="form-label">Select Model to Tune</label>
-                        <select class="form-control" id="model_to_tune" name="model_name" required>
-                            <option value="" disabled selected>Select a model</option>
-                            {% for model in available_models %}
-                                <option value="{{ model }}">{{ model }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="tuning_method" class="form-label">Tuning Method</label>
-                        <select class="form-control" id="tuning_method" name="method" required>
-                            <option value="GridSearch">Grid Search</option>
-                            <option value="RandomizedSearch">Randomized Search</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="param_grid" class="form-label">Parameter Grid (JSON format)</label>
-                        <textarea class="form-control" id="param_grid" name="param_grid" rows="5" placeholder='{"n_estimators": [100, 200], "max_depth": [5, 10]}' required></textarea>
-                        <small class="form-text text-muted">Example: {"n_estimators": [100, 200], "max_depth": [5, 10]}</small>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Run Tuning</button>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-4 mb-4">
-        <div class="card">
-            <div class="card-header">
-                3. Model Results
-            </div>
-            <div class="card-body">
-                {% if error %}
-                    <div class="alert alert-danger">{{ error }}</div>
-                {% endif %}
-                {% if results %}
-                    <div class="table-responsive mb-4">
-                        <h4>Model Metrics</h4>
-                        {{ results|safe }}
-                    </div>
-                {% else %}
-                    <p>No model results to display yet. Configure and run models to see results here.</p>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="row">
-    <div class="col-md-12">
-        {% if feature_importance_plot %}
-            <div class="card mb-4">
-                <div class="card-header">
-                    Feature Importance
-                </div>
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-4">
+            <h2>Model Building</h2>
+            <p>Train and evaluate various machine learning models.</p>
+            <div class="card">
+                <div class="card-header"><h4>Configure Model</h4></div>
                 <div class="card-body">
-                    <div id="feature-importance-plot"></div>
+                    <form action="{{ url_for('modeling') }}" method="post">
+                        <div class="mb-3">
+                            <label for="model_type" class="form-label">Model Type</label>
+                            <select class="form-select" name="model_type" id="model_type" required>
+                                <option value="Classification">Classification</option>
+                                <option value="Regression">Regression</option>
+                                <option value="Clustering">Clustering</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="model_name" class="form-label">Model Name</label>
+                            <select class="form-select" name="model_name" id="model_name" required>
+                                <!-- Populated by JS -->
+                            </select>
+                        </div>
+                        <div class="mb-3" id="target-column-model-wrapper">
+                            <label for="target_column" class="form-label">Target Column</label>
+                            <select class="form-select" name="target_column" id="target_column">
+                                {% for c in columns %}<option value="{{c}}">{{c}}</option>{% endfor %}
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">Run Model</button>
+                    </form>
                 </div>
             </div>
-        {% endif %}
-
-        {% if confusion_matrix_plot %}
-            <div class="card mb-4">
-                <div class="card-header">
-                    Confusion Matrix
+        </div>
+        <div class="col-md-8">
+            <h2>Model Report</h2>
+            {% if report %}
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Report for: {{ report.model_name }} ({{ report.model_type }})</h5>
+                    </div>
+                    <div class="card-body">
+                        <h4>Metrics</h4>
+                        <ul>
+                        {% for metric, value in report.metrics.items() %}
+                            <li><strong>{{ metric }}:</strong> {{ "%.4f"|format(value) }}</li>
+                        {% endfor %}
+                        </ul>
+                        <hr>
+                        {% if report.confusion_matrix %}
+                            <h4>Confusion Matrix</h4>
+                            <div id="confusion-matrix-plot"></div>
+                        {% endif %}
+                        {% if report.regression_plot %}
+                            <h4>Regression Plot</h4>
+                            <div id="regression-plot"></div>
+                        {% endif %}
+                         {% if report.cluster_plot %}
+                            <h4>Cluster Plot (PCA)</h4>
+                            <div id="cluster-plot"></div>
+                        {% endif %}
+                        {% if report.shap_plot %}
+                            <hr>
+                            <h4>Feature Importance (SHAP)</h4>
+                            {{ report.shap_plot|safe }}
+                        {% endif %}
+                    </div>
                 </div>
-                <div class="card-body">
-                    <div id="confusion-matrix-plot"></div>
-                </div>
-            </div>
-        {% endif %}
+            {% else %}
+                <p>No model report to display. Run a model to see the results.</p>
+            {% endif %}
+        </div>
     </div>
 </div>
+{% endblock %}
 
+{% block scripts %}
 <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        {% if feature_importance_plot %}
-            var fi_plot_data = JSON.parse('{{ feature_importance_plot | safe }}');
-            Plotly.newPlot('feature-importance-plot', fi_plot_data.data, fi_plot_data.layout);
-        {% endif %}
+document.addEventListener('DOMContentLoaded', function() {
+    const models = {{ models|tojson }};
+    const modelTypeSelect = document.getElementById('model_type');
+    const modelNameSelect = document.getElementById('model_name');
+    const targetWrapper = document.getElementById('target-column-model-wrapper');
 
-        {% if confusion_matrix_plot %}
-            var cm_plot_data = JSON.parse('{{ confusion_matrix_plot | safe }}');
-            Plotly.newPlot('confusion-matrix-plot', cm_plot_data.data, cm_plot_data.layout);
-        {% endif %}
-    });
+    function updateModelNames() {
+        const selectedType = modelTypeSelect.value;
+        modelNameSelect.innerHTML = '';
+        models[selectedType].forEach(model => {
+            const option = document.createElement('option');
+            option.value = model;
+            option.textContent = model;
+            modelNameSelect.appendChild(option);
+        });
+
+        if (selectedType === 'Clustering') {
+            targetWrapper.style.display = 'none';
+        } else {
+            targetWrapper.style.display = 'block';
+        }
+    }
+
+    modelTypeSelect.addEventListener('change', updateModelNames);
+    updateModelNames(); // Initial population
+
+    // Render plots if report is available
+    {% if report and report.confusion_matrix %}
+        const cmPlot = JSON.parse('{{ report.confusion_matrix|safe }}');
+        Plotly.newPlot('confusion-matrix-plot', cmPlot.data, cmPlot.layout);
+    {% endif %}
+    {% if report and report.regression_plot %}
+        const regPlot = JSON.parse('{{ report.regression_plot|safe }}');
+        Plotly.newPlot('regression-plot', regPlot.data, regPlot.layout);
+    {% endif %}
+     {% if report and report.cluster_plot %}
+        const clusterPlot = JSON.parse('{{ report.cluster_plot|safe }}');
+        Plotly.newPlot('cluster-plot', clusterPlot.data, clusterPlot.layout);
+    {% endif %}
+});
 </script>
 {% endblock %}

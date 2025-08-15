@@ -1,67 +1,139 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="row">
-    <div class="col-md-12">
-        <h2 class="mb-4">Data Filtering</h2>
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8">
+            <h2>Data Filtering</h2>
+            <p>Apply filters to your dataset. The available operators will change based on the selected column's data type.</p>
+        </div>
     </div>
-</div>
 
-<div class="row">
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">
-                Configure Filter
-            </div>
-            <div class="card-body">
-                <form action="{{ url_for('data_filtering') }}" method="POST">
-                    <div class="mb-3">
-                        <label for="column" class="form-label">Column</label>
-                        <select class="form-control" id="column" name="column" required>
-                            <option value="" disabled selected>Select a column</option>
-                            {% for column in columns %}
-                                <option value="{{ column }}">{{ column }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="operator" class="form-label">Operator</label>
-                        <select class="form-control" id="operator" name="operator" required>
-                            <option value="" disabled selected>Select an operator</option>
-                            <option value=">">Greater than (&gt;)</option>
-                            <option value="<">Less than (&lt;)</option>
-                            <option value="==">Equal to (==)</option>
-                            <option value="!=">Not equal to (!=)</option>
-                            <option value=">=">Greater than or equal to (&gt;=)</option>
-                            <option value="<=">Less than or equal to (&lt;=)</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="value" class="form-label">Value</label>
-                        <input type="text" class="form-control" id="value" name="value" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Apply Filter</button>
-                </form>
+    <div class="row mt-3">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Configure Filter</h4>
+                </div>
+                <div class="card-body">
+                    <form action="{{ url_for('data_filtering') }}" method="POST">
+                        <div class="mb-3">
+                            <label for="column" class="form-label">Column</label>
+                            <select class="form-select" id="column" name="column" required>
+                                <option value="" disabled selected>Select a column</option>
+                                {% for column in columns %}
+                                    <option value="{{ column }}">{{ column }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="operator" class="form-label">Operator</label>
+                            <select class="form-select" id="operator" name="operator" required>
+                                <option value="" disabled selected>Select an operator</option>
+                                <!-- Operators will be populated by JavaScript -->
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="value" class="form-label">Value</label>
+                            <input type="text" class="form-control" id="value" name="value" required
+                                   placeholder="Enter value (e.g., 10 or 'apple, banana' for isin)">
+                        </div>
+                        <div class="mb-3" id="value2-wrapper" style="display: none;">
+                            <label for="value2" class="form-label">Second Value (for 'between')</label>
+                            <input type="text" class="form-control" id="value2" name="value2">
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">Apply Filter</button>
+                    </form>
+                </div>
             </div>
         </div>
-    </div>
-    
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header">
-                Filtered Data
-            </div>
-            <div class="card-body">
-                {% if error %}
-                    <div class="alert alert-danger">{{ error }}</div>
-                {% endif %}
-                {% if filtered_df %}
-                    {{ filtered_df|safe }}
-                {% else %}
-                    <p>No filtered data to display yet. Apply a filter to see results.</p>
-                {% endif %}
-            </div>
+        <div class="col-md-6">
+            {% include 'data_viewer.html' %}
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const columnSelect = document.getElementById('column');
+    const operatorSelect = document.getElementById('operator');
+    const value2Wrapper = document.getElementById('value2-wrapper');
+
+    const columnDtypes = JSON.parse('{{ column_dtypes|safe }}');
+
+    const operators = {
+        numeric: [
+            { val: '==', text: 'Equal to (==)' },
+            { val: '!=', text: 'Not equal to (!=)' },
+            { val: '>', text: 'Greater than (>)' },
+            { val: '<', text: 'Less than (<)' },
+            { val: '>=', text: 'Greater than or equal to (>=)' },
+            { val: '<=', text: 'Less than or equal to (<=)' },
+            { val: 'between', text: 'Between' }
+        ],
+        string: [
+            { val: '==', text: 'Equal to (==)' },
+            { val: '!=', text: 'Not equal to (!=)' },
+            { val: 'contains', text: 'Contains' },
+            { val: 'startswith', text: 'Starts with' },
+            { val: 'endswith', text: 'Ends with' },
+            { val: 'isin', text: 'Is in (comma-separated)' },
+            { val: 'notin', text: 'Is not in (comma-separated)' }
+        ],
+        datetime: [
+            { val: '>', text: 'After (>)' },
+            { val: '<', text: 'Before (<)' },
+            { val: '>=', text: 'On or after (>=)' },
+            { val: '<=', text: 'On or before (<=)' },
+            { val: 'between', text: 'Between' }
+        ]
+    };
+
+    function updateOperators() {
+        const selectedColumn = columnSelect.value;
+        if (!selectedColumn) return;
+
+        const dtype = columnDtypes[selectedColumn];
+        let relevantOperators = [];
+
+        if (dtype.includes('int') || dtype.includes('float')) {
+            relevantOperators = operators.numeric;
+        } else if (dtype.includes('datetime')) {
+            relevantOperators = operators.datetime;
+        } else {
+            relevantOperators = operators.string;
+        }
+
+        operatorSelect.innerHTML = '<option value="" disabled selected>Select an operator</option>';
+        relevantOperators.forEach(op => {
+            const option = document.createElement('option');
+            option.value = op.val;
+            option.textContent = op.text;
+            operatorSelect.appendChild(option);
+        });
+
+        // Reset the value2 field visibility
+        value2Wrapper.style.display = 'none';
+        document.getElementById('value2').required = false;
+    }
+
+    function toggleValue2() {
+        if (operatorSelect.value === 'between') {
+            value2Wrapper.style.display = 'block';
+            document.getElementById('value2').required = true;
+        } else {
+            value2Wrapper.style.display = 'none';
+            document.getElementById('value2').required = false;
+        }
+    }
+
+    columnSelect.addEventListener('change', updateOperators);
+    operatorSelect.addEventListener('change', toggleValue2);
+
+    // Initialize on page load in case of a page refresh with selected values
+    updateOperators();
+});
+</script>
 {% endblock %}
