@@ -27,7 +27,20 @@
                 <form action="{{ url_for('ingest_url') }}" method="post">
                     <div class="mb-3">
                         <label for="url_link" class="form-label">Enter a data URL (CSV, Excel)</label>
-                        <input type="url" class="form-control" id="url_link" name="url_link" placeholder="e.g., https://example.com/data.csv" required>
+                        <input type="url" class="form-control" id="url_link" name="url_input" placeholder="e.g., https://example.com/data.csv" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="file_type" class="form-label">File Type</label>
+                        <select class="form-select" id="file_type" name="file_type" required>
+                            <option value="csv">CSV</option>
+                            <option value="excel">Excel</option>
+                            <option value="json">JSON</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="delimiter" class="form-label">Delimiter (for CSV)</label>
+                        <input type="text" class="form-control" id="delimiter" name="delimiter" value="," placeholder="," aria-describedby="delimiterHelp">
+                        <div id="delimiterHelp" class="form-text">Specify the delimiter if your CSV is not comma-separated.</div>
                     </div>
                     <button type="submit" class="btn btn-primary">Ingest</button>
                 </form>
