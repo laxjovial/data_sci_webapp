@@ -58,7 +58,7 @@ def load_data(source_path_or_file, source_type='upload', file_type=None, delimit
     """
     df = None
     error = None
-    temp_filepath = None
+    source_to_read = source_path_or_file
 
     try:
         if not file_type:
@@ -68,7 +68,7 @@ def load_data(source_path_or_file, source_type='upload', file_type=None, delimit
         if file_type.startswith('.'):
             file_type = file_type[1:]
 
-        # Prepare the data stream/path based on the source type
+        # For URL, download and save to a temporary file
         if source_type == 'url':
             url = _convert_gdrive_url(source_path_or_file)
             response = requests.get(url, timeout=20)
@@ -77,12 +77,8 @@ def load_data(source_path_or_file, source_type='upload', file_type=None, delimit
             # Use tempfile to write the content to a temporary file
             with tempfile.NamedTemporaryFile(delete=False, suffix=f'.{file_type}') as tmp_file:
                 tmp_file.write(response.content)
-                temp_filepath = tmp_file.name
-            
-            source_to_read = temp_filepath
-        else: # 'upload'
-            source_to_read = source_path_or_file
-
+                source_to_read = tmp_file.name
+        
         # Read the data based on file type
         if file_type == 'csv':
             df = dd.read_csv(source_to_read, delimiter=delimiter, encoding=encoding)
@@ -110,10 +106,10 @@ def load_data(source_path_or_file, source_type='upload', file_type=None, delimit
         error = f"Error: File not found at {source_path_or_file}."
     except Exception as e:
         error = f"An unexpected error occurred during data ingestion: {e}"
-    finally:
-        # Clean up the temporary file if it was created
-        if temp_filepath and os.path.exists(temp_filepath):
-            os.remove(temp_filepath)
+
+    # If a temporary file was created, ensure it is returned for later cleanup
+    if source_type == 'url' and df is not None:
+        return df, error, source_to_read
 
     # If there was a warning but the df was loaded, return both
     if df is not None and error and "Warning" in error:
