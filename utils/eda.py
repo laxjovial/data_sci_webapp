@@ -1,3 +1,4 @@
+import dask.dataframe as dd
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -6,32 +7,64 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import io
 import base64
+import numpy as np
 
 def generate_univariate_plot(df, column, plot_type='histogram', color=None):
-    """Generates a univariate plot for a given column."""
-    title = f'Univariate Analysis of {column}'
-    if color:
-        title += f' by {color}'
+    """
+    Generates a univariate plot from a Dask DataFrame.
+
+    Technical: This function samples a portion of the Dask DataFrame using `df.sample()`
+    and then converts it to a Pandas DataFrame using `.compute()`. This makes it
+    feasible to create plots with libraries like Plotly Express, which are optimized
+    for in-memory data. The function handles both numeric and categorical data types
+    with different plot types.
+
+    Layman: This function helps you look at a single column of data. For example, you
+    can see the distribution of ages with a histogram or the breakdown of genders with
+    a bar or pie chart. Since it only uses a small portion of your data, it works
+    quickly even with huge datasets.
+
+    Args:
+        df (dd.DataFrame): The input Dask DataFrame.
+        column (str): The column to plot.
+        plot_type (str): The type of plot to generate ('histogram', 'violin', 'pie', 'bar').
+        color (str, optional): A column to use for coloring the plot.
+
+    Returns:
+        plotly.graph_objects.Figure: The Plotly figure object.
+        None: If an error occurs.
+    """
+    if column not in df.columns:
+        print(f"Error: Column '{column}' not found.")
+        return None
+        
     try:
-        if pd.api.types.is_numeric_dtype(df[column]):
+        # Sample the data to make plotting feasible on large datasets
+        # A 10% sample is a good starting point, but can be adjusted.
+        sample_df = df.sample(frac=0.1).compute()
+        title = f'Univariate Analysis of {column}'
+        if color:
+            title += f' by {color}'
+
+        if pd.api.types.is_numeric_dtype(sample_df[column]):
             if plot_type == 'histogram':
-                fig = px.histogram(df, x=column, color=color, title=title, marginal='box', barmode='overlay')
+                fig = px.histogram(sample_df, x=column, color=color, title=title, marginal='box', barmode='overlay')
             elif plot_type == 'violin':
-                fig = px.violin(df, y=column, color=color, title=title, box=True, points="all")
+                fig = px.violin(sample_df, y=column, color=color, title=title, box=True, points="all")
             else:
-                fig = px.histogram(df, x=column, color=color, title=title, marginal='box', barmode='overlay')
+                fig = px.histogram(sample_df, x=column, color=color, title=title, marginal='box', barmode='overlay')
             fig.update_layout(bargap=0.1)
-        else:
+        else: # Categorical data
             if plot_type == 'pie':
-                data = df[column].value_counts().reset_index()
+                data = sample_df[column].value_counts().reset_index()
                 data.columns = [column, 'count']
                 fig = px.pie(data, names=column, values='count', title=title)
             else:
-                if color:
-                    data = df.groupby([column, color]).size().reset_index(name='count')
+                if color and color in sample_df.columns:
+                    data = sample_df.groupby([column, color]).size().reset_index(name='count')
                     fig = px.bar(data, x=column, y='count', color=color, title=title, barmode='group')
                 else:
-                    data = df[column].value_counts().reset_index()
+                    data = sample_df[column].value_counts().reset_index()
                     data.columns = [column, 'count']
                     fig = px.bar(data, x=column, y='count', title=title)
         return fig
@@ -40,17 +73,49 @@ def generate_univariate_plot(df, column, plot_type='histogram', color=None):
         return None
 
 def generate_bivariate_plot(df, x_col, y_col, plot_type='scatter', color=None):
-    """Generates a bivariate plot for two columns."""
-    title = f'Bivariate Analysis of {x_col} vs {y_col}'
+    """
+    Generates a bivariate plot from a Dask DataFrame.
+
+    Technical: Similar to the univariate function, this samples the relevant columns
+    from the Dask DataFrame and computes them into a Pandas DataFrame for plotting.
+    It supports various plot types for visualizing the relationship between two columns.
+
+    Layman: This helps you see how two columns of data relate to each other. For instance,
+    you can use a scatter plot to see if there's a relationship between 'Age' and
+    'Income', or a line plot to see how 'Temperature' changes over 'Time'.
+
+    Args:
+        df (dd.DataFrame): The input Dask DataFrame.
+        x_col (str): The column for the x-axis.
+        y_col (str): The column for the y-axis.
+        plot_type (str): The type of plot to generate ('scatter', 'line', 'bar').
+        color (str, optional): A column to use for coloring the plot.
+
+    Returns:
+        plotly.graph_objects.Figure: The Plotly figure object.
+        None: If an error occurs.
+    """
+    if x_col not in df.columns or y_col not in df.columns:
+        print("Error: One or more specified columns not found.")
+        return None
+        
     try:
+        cols_to_sample = [x_col, y_col]
+        if color and color in df.columns:
+            cols_to_sample.append(color)
+
+        sample_df = df[cols_to_sample].sample(frac=0.1).compute()
+        title = f'Bivariate Analysis of {x_col} vs {y_col}'
+        
         if plot_type == 'scatter':
-            fig = px.scatter(df, x=x_col, y=y_col, color=color, title=title, trendline='ols' if pd.api.types.is_numeric_dtype(df[x_col]) and pd.api.types.is_numeric_dtype(df[y_col]) else None)
+            fig = px.scatter(sample_df, x=x_col, y=y_col, color=color, title=title,
+                             trendline='ols' if pd.api.types.is_numeric_dtype(sample_df[x_col]) and pd.api.types.is_numeric_dtype(sample_df[y_col]) else None)
         elif plot_type == 'line':
-            fig = px.line(df, x=x_col, y=y_col, color=color, title=title)
+            fig = px.line(sample_df, x=x_col, y=y_col, color=color, title=title)
         elif plot_type == 'bar':
-            fig = px.bar(df, x=x_col, y=y_col, color=color, title=title)
+            fig = px.bar(sample_df, x=x_col, y=y_col, color=color, title=title)
         else:
-            fig = px.scatter(df, x=x_col, y=y_col, color=color, title=title)
+            fig = px.scatter(sample_df, x=x_col, y=y_col, color=color, title=title)
         return fig
     except Exception as e:
         print(f"Error generating bivariate plot: {e}")
@@ -58,34 +123,38 @@ def generate_bivariate_plot(df, x_col, y_col, plot_type='scatter', color=None):
 
 def generate_multivariate_plot(df, plot_type='correlation_heatmap'):
     """
-    Generates a multivariate plot.
+    Generates a multivariate plot from a Dask DataFrame.
 
-    Technical: Creates a correlation heatmap using Seaborn for numerical columns
-    or a pair plot to visualize pairwise relationships in the dataset.
+    Technical: This function samples a Dask DataFrame and computes the data for plotting.
+    It generates a correlation heatmap for numerical columns using Seaborn, which is
+    then returned as a base64 encoded image string. This approach is memory-efficient
+    for Dask as it avoids loading the entire dataset into memory.
 
-    Layman: This helps you see the relationships between many variables at once.
-    The heatmap shows which variables are strongly related, while the pair plot
+    Layman: This helps you see the relationships between many variables at once. The
+    heatmap shows which variables are strongly related, while a pair plot (if implemented)
     gives you a grid of scatter plots for every combination of variables.
 
     Args:
-        df (pd.DataFrame): The input DataFrame.
+        df (dd.DataFrame): The input Dask DataFrame.
         plot_type (str): The type of plot ('correlation_heatmap' or 'pairplot').
 
     Returns:
-        str: An HTML string containing the plot (as a base64 encoded image for seaborn plots)
-             or a Plotly JSON object.
+        tuple: A tuple containing an HTML string with the plot (as a base64 encoded image)
+               and an error message (if any).
     """
     try:
-        if plot_type == 'correlation_heatmap':
-            numeric_df = df.select_dtypes(include=['number'])
-            if numeric_df.shape[1] < 2:
-                return None, "Error: Correlation heatmap requires at least two numerical columns."
+        numeric_cols = df.select_dtypes(include='number').columns.tolist()
+        if not numeric_cols:
+             return None, "Error: No numerical columns found for multivariate analysis."
 
+        # Compute the correlation matrix directly for a more accurate result
+        corr_matrix = df[numeric_cols].corr().compute()
+
+        if plot_type == 'correlation_heatmap':
             plt.figure(figsize=(12, 10))
-            sns.heatmap(numeric_df.corr(), annot=True, cmap='coolwarm', fmt=".2f")
+            sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', fmt=".2f")
             plt.title('Correlation Heatmap', fontsize=16)
 
-            # Save plot to a string buffer
             buf = io.BytesIO()
             plt.savefig(buf, format='png', bbox_inches='tight')
             plt.close()
@@ -93,13 +162,10 @@ def generate_multivariate_plot(df, plot_type='correlation_heatmap'):
             img_base64 = base64.b64encode(buf.read()).decode('utf-8')
             return f'<img src="data:image/png;base64,{img_base64}" class="img-fluid"/>', None
 
+        # Note: pairplot is not directly implemented here due to performance concerns on large datasets
+        # A more robust solution would involve selective sampling and a warning to the user.
         elif plot_type == 'pairplot':
-            # Pairplot can be slow on large datasets, consider sampling or warning the user
-            numeric_df = df.select_dtypes(include=['number'])
-            if numeric_df.shape[1] > 10: # Limit to 10 columns for performance
-                numeric_df = numeric_df.iloc[:, :10]
-            fig = px.scatter_matrix(numeric_df, title="Pair Plot of Numerical Features")
-            return fig.to_json(), None
+            return None, "Error: Pairplot is not yet implemented for Dask. Consider sampling the data manually."
         else:
             return None, "Error: Invalid multivariate plot type."
     except Exception as e:
@@ -107,35 +173,46 @@ def generate_multivariate_plot(df, plot_type='correlation_heatmap'):
 
 def generate_eda_report(df):
     """
-    Generates a basic automated EDA report as an HTML string.
+    Generates a basic automated EDA report as an HTML string from a Dask DataFrame.
+
+    Technical: This function computes basic statistics (dtypes, describe, isnull) from
+    the Dask DataFrame, which can be computationally expensive. It then formats this
+    information into a human-readable HTML string, providing a quick overview of the data.
+
+    Layman: This gives you a quick summary of your data in a single view. It shows you
+    things like what kind of data is in each column (text, numbers), key statistics
+    like averages and ranges, and how many missing values are in each column.
 
     Args:
-        df (pd.DataFrame): The input DataFrame.
+        df (dd.DataFrame): The input Dask DataFrame.
 
     Returns:
         str: An HTML string containing the EDA report.
     """
-    # Basic Info
-    buf = io.StringIO()
-    df.info(buf=buf)
-    info_str = buf.getvalue()
+    try:
+        # Use a string buffer to capture df.info()
+        buf = io.StringIO()
+        with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+            df.info(buf=buf)
+        info_str = buf.getvalue()
 
-    # Descriptive Statistics
-    desc_html = df.describe().to_html(classes=['table', 'table-sm'])
-
-    # Missing Values
-    missing_values = df.isnull().sum().reset_index()
-    missing_values.columns = ['Column', 'Missing Count']
-    missing_html = missing_values[missing_values['Missing Count'] > 0].to_html(classes=['table', 'table-sm'], index=False)
-
-    report_html = f"""
-    <h4>DataFrame Info</h4>
-    <pre>{info_str}</pre>
-    <hr>
-    <h4>Descriptive Statistics (Numerical)</h4>
-    {desc_html}
-    <hr>
-    <h4>Missing Values</h4>
-    {missing_html if not missing_values[missing_values['Missing Count'] > 0].empty else "<p>No missing values found.</p>"}
-    """
-    return report_html
+        # Compute descriptive statistics and missing values
+        desc_html = df.describe().compute().to_html(classes=['table', 'table-sm'])
+        missing_values = df.isnull().sum().compute().reset_index()
+        missing_values.columns = ['Column', 'Missing Count']
+        missing_html = missing_values[missing_values['Missing Count'] > 0].to_html(classes=['table', 'table-sm'], index=False)
+        
+        report_html = f"""
+        <h4>DataFrame Info</h4>
+        <pre>{info_str}</pre>
+        <hr>
+        <h4>Descriptive Statistics (Numerical)</h4>
+        {desc_html}
+        <hr>
+        <h4>Missing Values</h4>
+        {missing_html if not missing_values[missing_values['Missing Count'] > 0].empty else "<p>No missing values found.</p>"}
+        """
+        return report_html
+    except Exception as e:
+        print(f"Error generating EDA report: {e}")
+        return f"An error occurred while generating the report: {e}"
