@@ -200,6 +200,50 @@ def upload_file():
 
     return redirect(url_for('index'))
 
+@app.route('/data_viewer', methods=['POST'])
+def data_viewer():
+    """
+    Handles POST requests for viewing and filtering the dataset.
+
+    This function is responsible for processing a form submission from the
+    data viewer section of the application. It retrieves the Dask DataFrame
+    from the user's session, performs an action (e.g., displaying the head),
+    and then re-renders the main index page.
+
+    The primary purpose of this endpoint is to act as the form's action for
+    data display controls, such as showing the top N rows or refreshing the view.
+
+    Returns:
+        A redirect to the index page, with a flash message indicating success or failure.
+    """
+    try:
+        # Load the Dask DataFrame from the session
+        df = load_df_from_session()
+        
+        if df is None:
+            flash('No data loaded. Please ingest a dataset first.', 'warning')
+            return redirect(url_for('index'))
+            
+        # You can add logic here to process the form data if needed.
+        # For example, if the form had a button to show the first 10 rows:
+        # head_df = df.head(10)
+        # Pass this to the template for rendering.
+
+        # For now, we will simply redirect back to the index page with a success message.
+        flash('Data viewer form submitted successfully!', 'success')
+        
+        # Track the action in the project history
+        track_history({
+            'action': 'data_viewer_action',
+            'details': 'Form submitted without specific action.'
+        })
+
+    except Exception as e:
+        # Handle any unexpected errors during the process
+        flash(f"An unexpected error occurred: {e}", 'danger')
+        
+    return redirect(url_for('index'))
+
 
 @app.route('/data_cleaning', methods=['GET', 'POST'])
 def data_cleaning():
