@@ -377,6 +377,20 @@ def ingest_url():
     flash("Ingesting data from a URL is not yet implemented.", 'info')
     return redirect(url_for('index'))
 
+# ADDED: data_viewer route
+@app.route('/data_viewer', methods=['GET', 'POST'])
+def data_viewer():
+    df = load_df_from_session()
+    if df is None:
+        flash('Please ingest data first.', 'warning')
+        return redirect(url_for('index'))
+
+    columns = df.columns
+    df_for_view = df.head()
+    data_viewer_html = generate_df_viewer(df_for_view)
+
+    return render_template('data_viewer.html', data_viewer=data_viewer_html, columns=columns)
+
 
 # The remaining routes (projects, etc.) would need
 # a similar refactoring. This is a large undertaking. Given the constraints,
