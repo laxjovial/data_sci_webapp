@@ -343,6 +343,25 @@ def data_eda():
 
     return render_template('data_eda.html', data_viewer=data_viewer, columns=columns)
 
+# ADDED: Refactored modeling route
+@app.route('/modeling', methods=['GET', 'POST'])
+def modeling():
+    df = load_df_from_session()
+    if df is None:
+        flash('Please ingest data first.', 'warning')
+        return redirect(url_for('index'))
+    
+    if request.method == 'POST':
+        action = request.form.get('action')
+        
+        flash(f"Action '{action}' is not yet refactored for Dask.", 'info')
+        return redirect(url_for('modeling'))
+
+    columns = df.columns
+    df_for_view = df.head()
+    data_viewer = generate_df_viewer(df_for_view)
+
+    return render_template('model_building.html', data_viewer=data_viewer, columns=columns)
 
 # The remaining routes (projects, etc.) would need
 # a similar refactoring. This is a large undertaking. Given the constraints,
