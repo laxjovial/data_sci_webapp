@@ -1,131 +1,115 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="row">
-    <div class="col-md-12">
-        <h2 class="mb-4">Data Combining</h2>
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <h2>Combine DataFrames</h2>
+            <p>Upload a second dataset and merge it with your current primary dataset.</p>
+        </div>
     </div>
-</div>
 
-<div class="row">
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">
-                Combine DataFrames
+    <!-- Section for Uploading the Second DataFrame -->
+    <div class="row mt-3">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Step 1: Upload Second DataFrame (Right Table)</h4>
+                </div>
+                <div class="card-body">
+                    <form action="{{ url_for('upload_combine_file') }}" method="post" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <label for="file_upload_combine" class="form-label">Choose a file to combine with</label>
+                            <input class="form-control" type="file" id="file_upload_combine" name="file_upload_combine" required>
+                        </div>
+                        <button type="submit" class="btn btn-secondary">Upload Second Dataset</button>
+                    </form>
+                </div>
             </div>
-            <div class="card-body">
-                <form action="{{ url_for('data_combining') }}" method="POST">
-                    <div class="mb-3">
-                        <label for="left_df" class="form-label">First DataFrame</label>
-                        <select class="form-control" id="left_df" name="left_df" required>
-                            <option value="" disabled selected>Select a DataFrame</option>
-                            {% for df_name in dataframes %}
-                                <option value="{{ df_name }}">{{ df_name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="right_df" class="form-label">Second DataFrame</label>
-                        <select class="form-control" id="right_df" name="right_df" required>
-                            <option value="" disabled selected>Select a DataFrame</option>
-                            {% for df_name in dataframes %}
-                                <option value="{{ df_name }}">{{ df_name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Combination Method</label>
-                        <div>
-                            <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="radio" name="method" id="methodMerge" value="merge" required>
-                                <label class="form-check-label" for="methodMerge">Merge</label>
-                            </div>
-                            <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="radio" name="method" id="methodConcat" value="concat">
-                                <label class="form-check-label" for="methodConcat">Concat</label>
-                            </div>
-                            <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="radio" name="method" id="methodJoin" value="join">
-                                <label class="form-check-label" for="methodJoin">Join</label>
-                            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Status</h4>
+                </div>
+                <div class="card-body">
+                    {% if df2_exists %}
+                        <div class="alert alert-success" role="alert">
+                            A second dataset has been uploaded and is ready for combining.
                         </div>
-                    </div>
-                    
-                    <div id="merge-options" style="display: none;">
-                        <div class="mb-3">
-                            <label for="merge_on" class="form-label">Column to Merge On</label>
-                            <select class="form-control" id="merge_on" name="on">
-                                <option value="" disabled selected>Select a column</option>
-                                {% for column in columns %}
-                                    <option value="{{ column }}">{{ column }}</option>
-                                {% endfor %}
-                            </select>
+                    {% else %}
+                        <div class="alert alert-info" role="alert">
+                            Please upload a second dataset to enable the merge controls.
                         </div>
-                        <div class="mb-3">
-                            <label for="merge_how" class="form-label">Merge Type</label>
-                            <select class="form-control" id="merge_how" name="how">
-                                <option value="inner">Inner</option>
-                                <option value="outer">Outer</option>
-                                <option value="left">Left</option>
-                                <option value="right">Right</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div id="concat-options" style="display: none;">
-                        <div class="mb-3">
-                            <label for="concat_axis" class="form-label">Axis</label>
-                            <select class="form-control" id="concat_axis" name="axis">
-                                <option value="0">0 (Rows)</option>
-                                <option value="1">1 (Columns)</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <button type="submit" class="btn btn-primary mt-3">Combine Data</button>
-                </form>
+                    {% endif %}
+                </div>
             </div>
         </div>
     </div>
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header">
-                Combined Data
-            </div>
-            <div class="card-body">
-                {% if error %}
-                    <div class="alert alert-danger">{{ error }}</div>
-                {% endif %}
-                {% if combined_df %}
-                    {{ combined_df | safe }}
-                {% else %}
-                    <p>No combined data to display yet. Combine two DataFrames to see results.</p>
-                {% endif %}
+
+    <!-- Section for Configuring and Performing the Merge -->
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Step 2: Configure and Perform Merge</h4>
+                </div>
+                <div class="card-body" {% if not df2_exists %}style="opacity: 0.5; pointer-events: none;"{% endif %}>
+                    <form action="{{ url_for('data_combining') }}" method="post">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <label for="how" class="form-label">Join Type</label>
+                                <select class="form-select" id="how" name="how" required>
+                                    <option value="inner">Inner Join</option>
+                                    <option value="left">Left Join</option>
+                                    <option value="right">Right Join</option>
+                                    <option value="outer">Outer Join</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="left_on" class="form-label">Left Table Key(s)</label>
+                                <select multiple class="form-select" id="left_on" name="left_on[]" required>
+                                    {% for col in df1_cols %}
+                                    <option value="{{ col }}">{{ col }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="right_on" class="form-label">Right Table Key(s)</label>
+                                <select multiple class="form-select" id="right_on" name="right_on[]" required>
+                                     {% for col in df2_cols %}
+                                    <option value="{{ col }}">{{ col }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-1 d-flex align-items-end">
+                                <button type="submit" class="btn btn-primary w-100" {% if not df2_exists %}disabled{% endif %}>Merge</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
+
+    <!-- Data Viewer Section -->
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <h5>Primary DataFrame (Left)</h5>
+            {% if df1_viewer %}
+                {{ df1_viewer|safe }}
+            {% else %}
+                <p>No primary data to display.</p>
+            {% endif %}
+        </div>
+        <div class="col-md-6">
+            <h5>Second DataFrame (Right)</h5>
+            {% if df2_viewer %}
+                {{ df2_viewer|safe }}
+            {% else %}
+                <p>No second dataframe uploaded.</p>
+            {% endif %}
+        </div>
+    </div>
 </div>
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    const methodRadios = document.querySelectorAll('input[name="method"]');
-    const mergeOptions = document.getElementById('merge-options');
-    const concatOptions = document.getElementById('concat-options');
-
-    function toggleOptions() {
-        if (document.getElementById('methodMerge').checked) {
-            mergeOptions.style.display = 'block';
-            concatOptions.style.display = 'none';
-        } else if (document.getElementById('methodConcat').checked) {
-            mergeOptions.style.display = 'none';
-            concatOptions.style.display = 'block';
-        } else {
-            mergeOptions.style.display = 'none';
-            concatOptions.style.display = 'none';
-        }
-    }
-
-    methodRadios.forEach(radio => radio.addEventListener('change', toggleOptions));
-    toggleOptions(); // Initial call to set visibility on page load
-});
-</script>
 {% endblock %}

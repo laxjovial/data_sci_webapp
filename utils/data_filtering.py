@@ -1,55 +1,90 @@
 import pandas as pd
+import io
 
-def filter_dataframe(df, column, operator, value):
+def filter_dataframe(df, column, operator, value, value2=''):
     """
-    Filters the DataFrame based on a condition.
+    Filters the DataFrame based on a condition, with support for more advanced operators.
 
-    Technical: This function dynamically builds a filter query. It first tries
-    to convert the 'value' to the same data type as the DataFrame column to
-    ensure type-safe comparison. It then uses boolean indexing to filter
-    the DataFrame based on the specified operator.
+    Technical: This function now handles a wider range of operators, including string-specific
+    methods like 'contains' and list-based filters like 'isin'/'notin'. For operators
+    that require a list (like 'isin'), it parses a comma-separated string from the user.
+    It also supports a 'between' operator which requires a second value.
 
-    Layman: This is like a search filter for your data. You can pick a column
-    (like 'Age'), an operator (like 'greater than'), and a value (like '30')
-    to see only the rows that match your criteria.
+    Layman: This is a more powerful search filter for your data. You can now search for
+    text that "contains" a certain word, or filter for rows where a category is "in" a
+    list of values you provide. You can also filter for numbers or dates "between" two points.
 
     Args:
         df (pd.DataFrame): The input DataFrame.
         column (str): The column to filter on.
-        operator (str): The comparison operator (e.g., '>', '<', '==', '!=', '>=', '<=').
-        value (str): The value to compare against.
+        operator (str): The comparison operator (e.g., '>', '<', '==', 'contains', 'isin', 'between').
+        value (str): The primary value to compare against.
+        value2 (str, optional): The second value for operators like 'between'.
 
     Returns:
         tuple: A tuple containing the filtered DataFrame and an error message (if any).
     """
     if column not in df.columns:
         return None, f"Error: Column '{column}' not found."
-    
+
+    df_filtered = df.copy()
+    col_dtype = df[column].dtype
+
     try:
-        # Try to convert the value to the column's data type
-        col_type = df[column].dtype
-        if pd.api.types.is_numeric_dtype(col_type):
-            value = float(value)
-        elif pd.api.types.is_datetime64_any_dtype(col_type):
-            value = pd.to_datetime(value)
-        else:
+        # --- Handle operators for numerical and datetime columns ---
+        if pd.api.types.is_numeric_dtype(col_dtype) or pd.api.types.is_datetime64_any_dtype(col_dtype):
+            # Convert value(s) to the correct type
+            value = pd.to_numeric(value, errors='coerce') if pd.api.types.is_numeric_dtype(col_dtype) else pd.to_datetime(value, errors='coerce')
+            if value is pd.NaT or value is None:
+                return None, "Error: Invalid filter value provided for the column's type."
+
+            if operator == '>':
+                df_filtered = df_filtered[df_filtered[column] > value]
+            elif operator == '<':
+                df_filtered = df_filtered[df_filtered[column] < value]
+            elif operator == '==':
+                df_filtered = df_filtered[df_filtered[column] == value]
+            elif operator == '!=':
+                df_filtered = df_filtered[df_filtered[column] != value]
+            elif operator == '>=':
+                df_filtered = df_filtered[df_filtered[column] >= value]
+            elif operator == '<=':
+                df_filtered = df_filtered[df_filtered[column] <= value]
+            elif operator == 'between':
+                value2 = pd.to_numeric(value2, errors='coerce') if pd.api.types.is_numeric_dtype(col_dtype) else pd.to_datetime(value2, errors='coerce')
+                if value2 is pd.NaT or value2 is None:
+                    return None, "Error: Invalid second filter value for 'between' operator."
+                df_filtered = df_filtered[df_filtered[column].between(value, value2)]
+            else:
+                return None, f"Error: Operator '{operator}' is not valid for numerical/date columns."
+
+        # --- Handle operators for string columns ---
+        elif pd.api.types.is_string_dtype(col_dtype) or col_dtype == 'object':
             value = str(value)
-            
-        if operator == '>':
-            filtered_df = df[df[column] > value]
-        elif operator == '<':
-            filtered_df = df[df[column] < value]
-        elif operator == '==':
-            filtered_df = df[df[column] == value]
-        elif operator == '!=':
-            filtered_df = df[df[column] != value]
-        elif operator == '>=':
-            filtered_df = df[df[column] >= value]
-        elif operator == '<=':
-            filtered_df = df[df[column] <= value]
+            if operator == '==':
+                df_filtered = df_filtered[df_filtered[column] == value]
+            elif operator == '!=':
+                df_filtered = df_filtered[df_filtered[column] != value]
+            elif operator == 'contains':
+                df_filtered = df_filtered[df_filtered[column].str.contains(value, na=False)]
+            elif operator == 'startswith':
+                df_filtered = df_filtered[df_filtered[column].str.startswith(value, na=False)]
+            elif operator == 'endswith':
+                df_filtered = df_filtered[df_filtered[column].str.endswith(value, na=False)]
+            elif operator in ['isin', 'notin']:
+                # Create a list from a comma-separated string
+                filter_list = [item.strip() for item in value.split(',')]
+                if operator == 'isin':
+                    df_filtered = df_filtered[df_filtered[column].isin(filter_list)]
+                else: # 'notin'
+                    df_filtered = df_filtered[~df_filtered[column].isin(filter_list)]
+            else:
+                return None, f"Error: Operator '{operator}' is not valid for text columns."
+
         else:
-            return None, f"Error: Invalid operator '{operator}'."
+            return None, "Error: Filtering is only supported for numerical, datetime, and text columns."
             
-        return filtered_df, None
-    except (ValueError, TypeError) as e:
-        return None, f"Error: Failed to filter. Check if the value type matches the column type. {e}"
+        return df_filtered, None
+
+    except Exception as e:
+        return None, f"Error during filtering: {e}. Please check your input values and operator."
