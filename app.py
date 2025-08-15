@@ -108,6 +108,70 @@ def index():
     data_viewer = generate_df_viewer(df)
     return render_template('index.html', data_viewer=data_viewer)
 
+
+@app.route('/ingest_url', methods=['POST'])
+def ingest_url():
+    """
+    Handles data ingestion from a URL, including Google Drive links.
+
+    This function processes a POST request containing a URL to a dataset.
+    It uses the `load_data` utility function to download and load the data
+    as a Dask DataFrame. The process includes:
+    1. Retrieving URL and optional parameters (file type, delimiter) from the form.
+    2. Calling `load_data` with 'url' as the source type.
+    3. Storing the temporary file path returned by `load_data` to ensure it's
+       deleted after the data is loaded, which is a crucial step for resource management.
+    4. Handling potential errors from the download or data parsing.
+    5. Saving the successfully loaded Dask DataFrame to the Flask session.
+    6. Logging the ingestion event to the project's history.
+    7. Providing user feedback via flashed messages.
+    """
+    temp_file_path = None
+    try:
+        url = request.form.get('url_input')
+        file_type = request.form.get('file_type')
+        delimiter = request.form.get('delimiter', ',')
+        
+        if not url:
+            flash('URL cannot be empty.', 'danger')
+            return redirect(url_for('index'))
+
+        # Call the load_data function from the utils module
+        df, error, temp_file_path = load_data(url, source_type='url', file_type=file_type, delimiter=delimiter)
+
+        if error:
+            flash(error, 'danger')
+            return redirect(url_for('index'))
+
+        if df is None:
+            flash("Failed to load data from URL. Please check the URL and file type.", 'danger')
+            return redirect(url_for('index'))
+            
+        # Store the Dask DataFrame in the session
+        save_df_to_session(df)
+        
+        # Track the action in the project history
+        track_history({
+            'action': 'ingest_url',
+            'source': url,
+            'file_type': file_type,
+            'delimiter': delimiter
+        })
+
+        flash('Data ingested successfully from URL!', 'success')
+
+    except Exception as e:
+        # Catch any unexpected errors during the process
+        flash(f"An unexpected error occurred during URL ingestion: {e}", 'danger')
+    
+    finally:
+        # Clean up the temporary file if it was created
+        if temp_file_path and os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
+
+    return redirect(url_for('index'))
+
+
 @app.route('/upload_file', methods=['POST'])
 def upload_file():
     if 'file_upload' not in request.files:
