@@ -14,6 +14,9 @@ import dask.dataframe as dd
 import plotly.graph_objs as go
 import plotly.express as px
 
+import markdown
+from markupsafe import Markup
+
 # Import all the necessary functions from the utils package
 from utils import (
     load_data,
@@ -340,6 +343,26 @@ def modeling():
 
     report = session.get('modeling_report')
     return render_template('model_building.html', columns=df.columns, models=get_model_list(), report=report)
+
+
+
+@app.route('/user_guide')
+def user_guide():
+    # Construct the path to the markdown file
+    md_path = os.path.join(app.root_path, 'static', 'user_guide.md')
+    
+    # Read the markdown file content
+    try:
+        with open(md_path, 'r', encoding='utf-8') as f:
+            md_content = f.read()
+    except FileNotFoundError:
+        return "User guide not found.", 404
+    
+    # Convert markdown to HTML and wrap it in Markup
+    html_content = Markup(markdown.markdown(md_content))
+    
+    # Render the HTML content within a template
+    return render_template('user_guide.html', html_content=html_content)
 
 @app.route('/projects', methods=['GET', 'POST'])
 def projects():
