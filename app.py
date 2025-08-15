@@ -141,7 +141,7 @@ def upload_file():
 
     return redirect(url_for('index'))
 
-# Refactored data_cleaning route to show the pattern
+# ADDED: Refactored data_cleaning route to show the pattern
 @app.route('/data_cleaning', methods=['GET', 'POST'])
 def data_cleaning():
     df = load_df_from_session()
@@ -367,6 +367,16 @@ def modeling():
 @app.route('/user_guide', methods=['GET'])
 def user_guide():
     return render_template('user_guide.html')
+
+# ADDED: ingest_url route
+@app.route('/ingest_url', methods=['POST'])
+def ingest_url():
+    # This is a placeholder for the actual logic to fetch data from a URL.
+    # The actual implementation would use `requests` or a similar library.
+    # It would then save the data and process it like a file upload.
+    flash("Ingesting data from a URL is not yet implemented.", 'info')
+    return redirect(url_for('index'))
+
 
 # The remaining routes (projects, etc.) would need
 # a similar refactoring. This is a large undertaking. Given the constraints,
