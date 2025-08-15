@@ -349,7 +349,7 @@ def modeling():
 @app.route('/user_guide')
 def user_guide():
     # Construct the path to the markdown file
-    md_path = os.path.join(app.root_path, 'static', 'user_guide.md')
+    md_path = os.path.join(app.root_path, 'static', 'USER_GUIDE.md')
     
     # Read the markdown file content
     try:
