@@ -377,16 +377,34 @@ def ingest_url():
         return redirect(url_for('index'))
     
     # Call the load_data function with the URL and source_type='url'
-    df, error = load_data(url, source_type='url')
+    result = load_data(url, source_type='url')
     
-    if error:
-        flash(error, 'danger')
-    elif df is not None:
-        save_df_to_session(df)
-        session['history'] = []
-        flash('Data ingested from URL successfully!', 'success')
+    # Check the return value to see if a temporary file path was provided
+    if len(result) == 3:
+        df, error, temp_filepath = result
+        # Ensure the temporary file is deleted after the Dask DataFrame is successfully saved
+        try:
+            if error:
+                flash(error, 'danger')
+            elif df is not None:
+                save_df_to_session(df)
+                session['history'] = []
+                flash('Data ingested from URL successfully!', 'success')
+            else:
+                flash("An unknown error occurred during URL ingestion.", 'danger')
+        finally:
+            if temp_filepath and os.path.exists(temp_filepath):
+                os.remove(temp_filepath)
     else:
-        flash("An unknown error occurred during URL ingestion.", 'danger')
+        df, error = result
+        if error:
+            flash(error, 'danger')
+        elif df is not None:
+            save_df_to_session(df)
+            session['history'] = []
+            flash('Data ingested from URL successfully!', 'success')
+        else:
+            flash("An unknown error occurred during URL ingestion.", 'danger')
     
     return redirect(url_for('index'))
 
