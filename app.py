@@ -368,14 +368,28 @@ def modeling():
 def user_guide():
     return render_template('user_guide.html')
 
-# ADDED: ingest_url route
+# UPDATED: Implemented the logic to fetch data from a URL
 @app.route('/ingest_url', methods=['POST'])
 def ingest_url():
-    # This is a placeholder for the actual logic to fetch data from a URL.
-    # The actual implementation would use `requests` or a similar library.
-    # It would then save the data and process it like a file upload.
-    flash("Ingesting data from a URL is not yet implemented.", 'info')
+    url = request.form.get('url_link')
+    if not url:
+        flash("Please provide a URL.", 'danger')
+        return redirect(url_for('index'))
+    
+    # Call the load_data function with the URL and source_type='url'
+    df, error = load_data(url, source_type='url')
+    
+    if error:
+        flash(error, 'danger')
+    elif df is not None:
+        save_df_to_session(df)
+        session['history'] = []
+        flash('Data ingested from URL successfully!', 'success')
+    else:
+        flash("An unknown error occurred during URL ingestion.", 'danger')
+    
     return redirect(url_for('index'))
+
 
 # ADDED: data_viewer route
 @app.route('/data_viewer', methods=['GET', 'POST'])
