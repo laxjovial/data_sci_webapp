@@ -5,6 +5,7 @@ import requests
 import io
 import re
 import os
+import tempfile
 
 def _get_file_extension(path):
     """Extracts the file extension from a path or URL."""
@@ -57,6 +58,7 @@ def load_data(source_path_or_file, source_type='upload', file_type=None, delimit
     """
     df = None
     error = None
+    temp_filepath = None
 
     try:
         if not file_type:
@@ -71,31 +73,31 @@ def load_data(source_path_or_file, source_type='upload', file_type=None, delimit
             url = _convert_gdrive_url(source_path_or_file)
             response = requests.get(url, timeout=20)
             response.raise_for_status()
-            data_stream = io.BytesIO(response.content)
-            # For text-based formats, we might need a string buffer
-            if file_type in ['csv', 'json']:
-                 data_stream = io.StringIO(response.text)
+            
+            # Use tempfile to write the content to a temporary file
+            with tempfile.NamedTemporaryFile(delete=False, suffix=f'.{file_type}') as tmp_file:
+                tmp_file.write(response.content)
+                temp_filepath = tmp_file.name
+            
+            source_to_read = temp_filepath
         else: # 'upload'
-            data_stream = source_path_or_file
+            source_to_read = source_path_or_file
 
         # Read the data based on file type
         if file_type == 'csv':
-            df = dd.read_csv(data_stream, delimiter=delimiter, encoding=encoding, blocksize=None)
+            df = dd.read_csv(source_to_read, delimiter=delimiter, encoding=encoding)
         elif file_type in ['xls', 'xlsx']:
             # Dask does not have a direct excel reader, so we read with pandas and convert
-            pandas_df = pd.read_excel(data_stream)
+            pandas_df = pd.read_excel(source_to_read)
             df = dd.from_pandas(pandas_df, npartitions=2)
         elif file_type == 'json':
-            df = dd.read_json(data_stream, encoding=encoding, blocksize=None)
+            df = dd.read_json(source_to_read, encoding=encoding)
         elif file_type == 'parquet':
-            df = dd.read_parquet(data_stream)
+            df = dd.read_parquet(source_to_read)
         else:
             # As a fallback, try reading as CSV, as it's the most common format
             try:
-                if source_type == 'url':
-                    # Reset stream if already read
-                    data_stream.seek(0)
-                df = pd.read_csv(data_stream, delimiter=delimiter, encoding=encoding)
+                df = dd.read_csv(source_to_read, delimiter=delimiter, encoding=encoding)
                 error = f"Warning: File type '{file_type}' not explicitly supported. Attempted to read as CSV."
             except Exception as fallback_e:
                 error = f"Error: Unsupported file type '{file_type}'. Could not read as CSV either. Details: {fallback_e}"
@@ -108,6 +110,10 @@ def load_data(source_path_or_file, source_type='upload', file_type=None, delimit
         error = f"Error: File not found at {source_path_or_file}."
     except Exception as e:
         error = f"An unexpected error occurred during data ingestion: {e}"
+    finally:
+        # Clean up the temporary file if it was created
+        if temp_filepath and os.path.exists(temp_filepath):
+            os.remove(temp_filepath)
 
     # If there was a warning but the df was loaded, return both
     if df is not None and error and "Warning" in error:
