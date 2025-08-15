@@ -12,7 +12,7 @@
                 View Options
             </div>
             <div class="card-body">
-                <form action="{{ url_for('data_filtering') }}" method="POST">
+                <form action="{{ url_for('data_viewer') }}" method="POST">
                     <div class="mb-3">
                         <label for="num_rows" class="form-label">Number of Rows to Display (Head)</label>
                         <input type="number" class="form-control" id="num_rows" name="num_rows" value="{{ num_rows }}" min="1" max="{{ total_rows }}" required>
