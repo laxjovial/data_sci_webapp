@@ -13,6 +13,23 @@ def _ensure_projects_dir():
 def save_project(project_name, df, history):
     """
     Saves the current state of a project, including the Dask DataFrame.
+
+    Technical: A new directory is created for the project. The Dask DataFrame is
+    saved to a subdirectory named 'data' using the Parquet format, which is efficient
+    for Dask's parallel processing. Project metadata and the operation history are
+    saved as a JSON file.
+
+    Layman: This function saves all your work on a project. It creates a special
+    folder for your project and stores the large data file and a log of all
+    the steps you've taken so far.
+
+    Args:
+        project_name (str): The name for the project.
+        df (dd.DataFrame): The current Dask DataFrame to save.
+        history (list): A list of operations performed.
+
+    Returns:
+        tuple: (success, message)
     """
     _ensure_projects_dir()
     project_path = os.path.join(PROJECTS_DIR, project_name)
@@ -21,7 +38,7 @@ def save_project(project_name, df, history):
 
     try:
         os.makedirs(project_path)
-        # Save the dask dataframe
+        # Save the Dask DataFrame to a subdirectory, as Dask saves multiple files
         df.to_parquet(os.path.join(project_path, 'data'))
         # Save metadata and history
         metadata = {
@@ -33,11 +50,27 @@ def save_project(project_name, df, history):
             json.dump(metadata, f, indent=4)
         return True, "Project saved successfully."
     except Exception as e:
+        # Clean up the directory if an error occurs during saving
+        if os.path.exists(project_path):
+            shutil.rmtree(project_path)
         return False, f"Error saving project: {e}"
 
 def load_project(project_name):
     """
     Loads a project's Dask DataFrame and history.
+
+    Technical: The function looks for a project directory by name. It then uses Dask's
+    `read_parquet` to load the data lazily from the 'data' subdirectory. The metadata,
+    including the operation history, is loaded from the 'project.json' file.
+
+    Layman: This function opens a previously saved project. It gets the data you were
+    working on and all the steps you performed, so you can continue right where you left off.
+
+    Args:
+        project_name (str): The name of the project to load.
+
+    Returns:
+        tuple: (Dask DataFrame, history, error_message)
     """
     project_path = os.path.join(PROJECTS_DIR, project_name)
     if not os.path.exists(project_path):
@@ -53,7 +86,19 @@ def load_project(project_name):
         return None, None, f"Error loading project: {e}"
 
 def list_projects():
-    """Lists all saved projects."""
+    """
+    Lists all saved projects.
+
+    Technical: The function scans the main projects directory. For each subdirectory,
+    it attempts to read the 'project.json' file to retrieve metadata. Invalid directories
+    (those without a 'project.json') are skipped. The list is sorted by creation date.
+
+    Layman: This shows you a list of all the projects you've saved, along with
+    their details like when they were created.
+
+    Returns:
+        list: A list of project metadata dictionaries.
+    """
     _ensure_projects_dir()
     projects = []
     for project_name in os.listdir(PROJECTS_DIR):
@@ -61,16 +106,32 @@ def list_projects():
         if os.path.isdir(project_path):
             try:
                 with open(os.path.join(project_path, 'project.json'), 'r') as f:
-                    projects.append(json.load(f))
-            except FileNotFoundError:
-                continue
+                    metadata = json.load(f)
+                    projects.append(metadata)
+            except (FileNotFoundError, json.JSONDecodeError):
+                continue  # Skip directories that are not valid projects
     return sorted(projects, key=lambda x: x.get('created_at', ''), reverse=True)
 
 def delete_project(project_name):
-    """Deletes a project."""
+    """
+    Deletes a project.
+
+    Technical: The function removes the entire project directory and all its contents,
+    including the data and metadata files, using `shutil.rmtree`. This provides a
+    complete and clean deletion.
+
+    Layman: This permanently deletes a project and all its data.
+
+    Args:
+        project_name (str): The name of the project to delete.
+
+    Returns:
+        tuple: (success, message)
+    """
     project_path = os.path.join(PROJECTS_DIR, project_name)
     if not os.path.exists(project_path):
         return False, "Project not found."
+
     try:
         shutil.rmtree(project_path)
         return True, "Project deleted successfully."

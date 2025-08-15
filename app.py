@@ -42,35 +42,54 @@ os.makedirs(app.config['PROJECTS_DIR'], exist_ok=True)
 
 # --- Data File Cleanup ---
 def cleanup_old_files(directory, max_age_hours=24):
+    """Cleans up files in a directory older than a certain age."""
     now = time.time()
     max_age_seconds = max_age_hours * 3600
+
     for filename in os.listdir(directory):
         filepath = os.path.join(directory, filename)
         if os.stat(filepath).st_mtime < now - max_age_seconds:
-            shutil.rmtree(filepath) if os.path.isdir(filepath) else os.remove(filepath)
+            if os.path.isfile(filepath):
+                os.remove(filepath)
+            elif os.path.isdir(filepath):
+                shutil.rmtree(filepath)
+            print(f"Removed old file/dir: {filepath}")
 
 def start_cleanup_scheduler():
-    Timer(6 * 3600, start_cleanup_scheduler).start()
+    """Starts the periodic cleanup of old data and project files."""
     cleanup_old_files(app.config['DATA_FOLDER'])
     cleanup_old_files(app.config['PROJECTS_DIR'])
+    # Rerun this function every 6 hours
+    Timer(6 * 3600, start_cleanup_scheduler).start()
 
 start_cleanup_scheduler()
 
 # --- Dask-aware Session Management ---
 def save_df_to_session(df, key='current_df_path'):
-    dir_path = os.path.join(app.config['DATA_FOLDER'], f"{uuid.uuid4()}")
-    if key in session and session.get(key) and os.path.exists(session[key]):
-        shutil.rmtree(session[key])
-    df.to_parquet(dir_path)
-    session[key] = dir_path
+    """Saves a Dask DataFrame to Parquet and stores the path in the session."""
+    if df is not None:
+        dir_path = os.path.join(app.config['DATA_FOLDER'], f"{uuid.uuid4()}")
+        if key in session and session.get(key) and os.path.exists(session[key]):
+            shutil.rmtree(session[key])
+        df.to_parquet(dir_path)
+        session[key] = dir_path
 
 def load_df_from_session(key='current_df_path'):
+    """Loads a Dask DataFrame from a path stored in the session."""
     if key in session and session.get(key):
-        return dd.read_parquet(session[key])
+        dir_path = session[key]
+        try:
+            df = dd.read_parquet(dir_path)
+            return df
+        except Exception as e:
+            flash(f"Error loading DataFrame from path: {e}", "danger")
+            return None
     return None
 
 def generate_df_viewer(df, num_rows=5):
+    """Helper function to generate an HTML table for viewing a Dask DataFrame."""
     if df is not None:
+        # Compute only the head for display
         return df.head(num_rows).to_html(classes=['table', 'table-striped', 'table-hover', 'table-responsive'], border=0)
     return None
 
@@ -88,26 +107,39 @@ def index():
 
 @app.route('/upload_file', methods=['POST'])
 def upload_file():
-    if 'file_upload' not in request.files: return redirect(url_for('index'))
+    if 'file_upload' not in request.files:
+        flash("No file part in the request.", 'danger')
+        return redirect(url_for('index'))
+    
     file = request.files['file_upload']
-    if not file or file.filename == '': return redirect(url_for('index'))
+    if file.filename == '':
+        flash("No selected file.", 'danger')
+        return redirect(url_for('index'))
 
     filepath = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(file.filename))
     file.save(filepath)
 
-    df, error = load_data(filepath) # load_data will now return a Dask df
-    if error:
-        flash(error, 'danger')
-    else:
+    try:
+        df, error = load_data(filepath)
+        if error:
+            flash(error, 'danger')
+            return redirect(url_for('index'))
+        
         save_df_to_session(df)
         session['history'] = []
         flash('File uploaded and ingested as a scalable Dask DataFrame!', 'success')
+    except Exception as e:
+        flash(f"Error processing file: {e}", 'danger')
+
     return redirect(url_for('index'))
+
 
 @app.route('/data_cleaning', methods=['GET', 'POST'])
 def data_cleaning():
     df = load_df_from_session()
-    if df is None: return redirect(url_for('index'))
+    if df is None:
+        flash('Please ingest data first.', 'warning')
+        return redirect(url_for('index'))
 
     if request.method == 'POST':
         action = request.form.get('action')
@@ -115,65 +147,137 @@ def data_cleaning():
 
         if action == 'handle_missing_values':
             new_df, error = handle_missing_values(df, request.form.getlist('columns[]'), request.form.get('strategy'))
-        # ... other actions ...
+        elif action == 'remove_duplicates':
+            new_df, error = remove_duplicates(df, subset=request.form.getlist('subset[]'))
+        # Add more cleaning actions here...
 
         if error:
             flash(error, 'danger')
         else:
-            save_df_to_session(new_df)
             track_history(request.form.to_dict())
+            save_df_to_session(new_df)
             flash(f'Action "{action}" applied.', 'success')
         return redirect(url_for('data_cleaning'))
 
-    df_computed = df.head()
-    return render_template('data_cleaning.html',
-                           columns=df.columns,
-                           df=df_computed,
-                           data_viewer=generate_df_viewer(df_computed))
+    columns = df.columns
+    df_for_view = df.head()
+    data_viewer = generate_df_viewer(df_for_view)
+    
+    return render_template('data_cleaning.html', data_viewer=data_viewer, columns=columns)
 
-# ... All other data manipulation routes (data_filtering, data_combining, etc.)
-# would follow the same pattern as data_cleaning above.
-# They load the dask df, apply the dask-aware util function, save the new dask df,
-# and for the GET request, compute the head for display.
+
+@app.route('/data_filtering', methods=['GET', 'POST'])
+def data_filtering():
+    df = load_df_from_session()
+    if df is None:
+        flash('Please ingest data first.', 'warning')
+        return redirect(url_for('index'))
+
+    if request.method == 'POST':
+        column = request.form.get('column')
+        operator = request.form.get('operator')
+        value = request.form.get('value')
+        value2 = request.form.get('value2')
+
+        try:
+            new_df, error = filter_dataframe(df, column, operator, value, value2)
+            if error:
+                flash(error, 'danger')
+                return redirect(url_for('data_filtering'))
+
+            track_history(request.form.to_dict())
+            save_df_to_session(new_df)
+            flash('Data filtering applied successfully!', 'success')
+        
+        except Exception as e:
+            flash(f'An error occurred during filtering: {e}', 'danger')
+        
+        return redirect(url_for('data_filtering'))
+
+    columns = df.columns
+    df_for_view = df.head()
+    data_viewer = generate_df_viewer(df_for_view)
+    
+    return render_template('data_filtering.html', data_viewer=data_viewer, columns=columns)
+
+@app.route('/data_aggregation', methods=['GET', 'POST'])
+def data_aggregation():
+    df = load_df_from_session()
+    if df is None:
+        flash('Please ingest data first.', 'warning')
+        return redirect(url_for('index'))
+
+    if request.method == 'POST':
+        action = request.form.get('action')
+        # Placeholder for Dask-aware aggregation logic
+        flash(f"Action '{action}' is not yet refactored for Dask.", 'info')
+        return redirect(url_for('data_aggregation'))
+
+    columns = df.columns
+    df_for_view = df.head()
+    data_viewer = generate_df_viewer(df_for_view)
+    
+    return render_template('data_aggregation.html', data_viewer=data_viewer, columns=columns)
 
 @app.route('/data_engineering', methods=['GET', 'POST'])
 def data_engineering():
     df = load_df_from_session()
-    if df is None: return redirect(url_for('index'))
+    if df is None:
+        flash('Please ingest data first.', 'warning')
+        return redirect(url_for('index'))
 
     if request.method == 'POST':
         action = request.form.get('action')
-        new_df, error = df, None
-        
-        # Example for one action
+        new_df, error = None, None
+
         if action == 'scale_features':
             new_df, error = scale_features(df, request.form.getlist('scale_columns[]'), request.form.get('scaler_type'))
-        # ... other actions ...
 
-        if error: flash(error, 'danger')
+        if error:
+            flash(error, 'danger')
         else:
-            save_df_to_session(new_df)
             track_history(request.form.to_dict())
+            save_df_to_session(new_df)
             flash(f'Action "{action}" applied.', 'success')
         return redirect(url_for('data_engineering'))
 
-    df_computed = df.head()
-    return render_template('data_engineering.html', columns=df.columns, df=df_computed, data_viewer=generate_df_viewer(df_computed))
+    columns = df.columns
+    df_for_view = df.head()
+    data_viewer = generate_df_viewer(df_for_view)
+    
+    return render_template('data_engineering.html', data_viewer=data_viewer, columns=columns)
+
+@app.route('/data_eda', methods=['GET', 'POST'])
+def data_eda():
+    df = load_df_from_session()
+    if df is None:
+        flash('Please ingest data first.', 'warning')
+        return redirect(url_for('index'))
+    
+    if request.method == 'POST':
+        # Placeholder for EDA logic, which would need to be Dask-aware or use .compute() carefully
+        flash("EDA generation is not yet refactored for Dask.", 'info')
+        return redirect(url_for('data_eda'))
+
+    columns = df.columns
+    df_for_view = df.head()
+    data_viewer = generate_df_viewer(df_for_view)
+    
+    return render_template('data_eda.html', data_viewer=data_viewer, columns=columns)
+
 
 @app.route('/modeling', methods=['GET', 'POST'])
 def modeling():
     df = load_df_from_session()
-    if df is None: return redirect(url_for('index'))
-
+    if df is None:
+        flash('Please ingest data first.', 'warning')
+        return redirect(url_for('index'))
+    
     if request.method == 'POST':
-        target_column = request.form.get('target_column')
-        model_type = request.form.get('model_type')
-        model_name = request.form.get('model_name')
-        
         # For modeling, we need to compute the data to pass to scikit-learn
         pandas_df = df.compute()
-        report = run_model(pandas_df, target_column, model_type, model_name)
-
+        report = run_model(pandas_df, request.form.get('target_column'), request.form.get('model_type'), request.form.get('model_name'))
+        
         if 'error' in report:
             flash(report['error'], 'danger')
         else:
@@ -192,13 +296,10 @@ def projects():
         if action == 'save':
             df = load_df_from_session()
             if df is not None:
-                # Project saving with Dask means saving the directory path
-                # The save_project util needs to be dask-aware
                 success, message = save_project(project_name, df, session.get('history', []))
                 flash(message, 'success' if success else 'danger')
 
         elif action == 'load':
-            # load_project returns a dask dataframe
             df, history, error = load_project(project_name)
             if error:
                 flash(error, 'danger')
@@ -211,15 +312,20 @@ def projects():
         elif action == 'delete':
             success, message = delete_project(project_name)
             flash(message, 'success' if success else 'danger')
+        
         return redirect(url_for('projects'))
 
-    return render_template('projects.html', projects=list_projects())
+    projects_list = list_projects()
+    return render_template('projects.html', projects=projects_list)
 
 @app.route('/download/<file_format>', methods=['GET'])
 def download(file_format):
     df = load_df_from_session()
-    if df is None: return redirect(url_for('index'))
+    if df is None:
+        flash('No data to download.', 'warning')
+        return redirect(url_for('index'))
 
+    # For download, we need to compute the result and convert to pandas
     pandas_df = df.compute()
     data, error = export_dataframe(pandas_df, file_format)
 
@@ -227,14 +333,32 @@ def download(file_format):
         flash(error, 'danger')
         return redirect(url_for('index'))
     
-    mimetypes = {'csv': 'text/csv', 'excel': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'json': 'application/json', 'parquet': 'application/octet-stream'}
-    filenames = {'csv': 'data.csv', 'excel': 'data.xlsx', 'json': 'data.json', 'parquet': 'data.parquet'}
+    mimetypes = {
+        'csv': 'text/csv',
+        'excel': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'json': 'application/json',
+        'parquet': 'application/octet-stream'
+    }
+    filenames = {
+        'csv': 'data.csv',
+        'excel': 'data.xlsx',
+        'json': 'data.json',
+        'parquet': 'data.parquet'
+    }
 
     if file_format not in mimetypes:
         flash('Invalid file format.', 'danger')
         return redirect(url_for('index'))
 
-    return send_file(io.BytesIO(data), mimetype=mimetypes[file_format], as_attachment=True, download_name=filenames[file_format])
+    mimetype = mimetypes[file_format]
+    filename = filenames[file_format]
+    
+    return send_file(
+        io.BytesIO(data),
+        mimetype=mimetype,
+        as_attachment=True,
+        download_name=filename
+    )
 
 if __name__ == '__main__':
     app.run(debug=True)
