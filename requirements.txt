@@ -1,13 +1,27 @@
+# Web Framework
 Flask
+gunicorn
+
+# Data Handling and Manipulation
+dask[dataframe]
 pandas
 numpy
+pyarrow
+fastparquet
+openpyxl  # For .xlsx file support
+
+# Machine Learning & Modeling
+category_encoders
+shap
 scikit-learn
-plotly
-requests
-openpyxl
+scikit-optimize
 xgboost
-gunicorn
 lightgbm
 catboost
-scikit-optimize
+
+# Plotting & EDA
+plotly
 nbformat
+
+# Other
+requests

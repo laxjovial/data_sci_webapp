@@ -1,86 +1,43 @@
-# Comprehensive Data Science Web Application
+# DataFlow Pro
 
-This is a full-featured web application designed to streamline the entire data science workflow, from data ingestion and cleaning to exploratory data analysis (EDA), feature engineering, and eventually, model building. It is built with Flask and provides an interactive, user-friendly interface for users of all experience levels.
+**DataFlow Pro** is a comprehensive, web-based platform designed to empower data scientists by providing a seamless, end-to-end workflow in a single, scalable application. This project demonstrates a full-stack approach to building data-intensive applications, combining a robust Python backend with a modern, responsive frontend.
 
-## Key Features
+![DataFlow Pro Screenshot](placeholder.png)  <!-- Placeholder for a screenshot -->
 
-- **Flexible Data Ingestion:** Load data from your local device (CSV, Excel) or directly from web URLs, including automatic handling of GitHub and Google Drive links.
-- **Robust Data Cleaning:** A suite of tools to handle common data quality issues:
-    - Manage missing values with various strategies (mean, median, mode, drop).
-    - Convert column data types.
-    - Remove duplicate rows.
-    - Standardize text (lowercase, uppercase, etc.).
-    - Handle outliers using IQR methods.
-    - Correct inconsistent values with a simple mapping dictionary.
-- **Advanced Exploratory Data Analysis (EDA):**
-    - **Univariate Analysis:** Explore individual variables through histograms and count plots.
-    - **Bivariate Analysis:** Compare pairs of variables using scatter plots, box plots, and heatmaps.
-    - **Multivariate Analysis:** Analyze relationships between multiple variables with correlation matrices and pair plots.
-- **Powerful Feature Engineering:**
-    - Create new features from existing ones using mathematical operations.
-    - Encode categorical variables using various techniques (One-Hot, Label, Ordinal, Frequency).
-    - Scale numerical features to a standard range (StandardScaler, MinMaxScaler).
-- **End-to-End Modeling Pipeline:**
-    - Train multiple classification or regression models simultaneously.
-    - Evaluate models using a comprehensive set of metrics and confusion matrices.
-    - Tune model hyperparameters to improve performance.
-    - View feature importance plots to understand model behavior.
-- **Project Management:**
-    - Save and load entire project sessions, including data and all operations performed.
-    - Manage and delete saved projects.
-- **Scalable Architecture:** The backend is built to handle large datasets by storing them on the server's filesystem, avoiding browser limitations.
+---
+
+## Core Features
+
+-   **End-to-End Workflow:** From data ingestion and cleaning to advanced modeling and visualization, every step of the data science pipeline is included.
+-   **Scalable by Design:** Built with **Dask**, the application can process datasets larger than memory, making it suitable for serious data analysis.
+-   **Expert-Level Tooling:** The application includes advanced, expert-level features that are often missing from simpler tools, such as:
+    -   **Advanced Imputation (KNN)**
+    -   **Target Encoding** for categorical features
+    -   **SHAP-based Model Explainability**
+    -   **Pivot Tables** and multi-level aggregations
+-   **Modern, Responsive UI:** The user interface is clean, professional, and fully responsive, providing a great experience on both desktop and mobile.
+-   **Project Management:** Save and load entire work sessions, including the dataset and the complete history of all transformations.
+
+---
+
+## Documentation Suite
+
+This project is extensively documented for different audiences. Please see the guides below for more details.
+
+-   **[User Guide](./USER_GUIDE.md):** A guide for end-users on how to use the application's features.
+-   **[Owner's Guide (Developer & Maintainer)](./OWNERS_GUIDE.md):** A technical guide for developers on how to install, run, maintain, and extend the application.
+-   **[Recruiter's Guide](./RECRUITERS_GUIDE.md):** A high-level overview of the project's architecture and the skills it demonstrates.
+
+---
 
 ## Getting Started
 
-### Prerequisites
+To get the application running locally, please refer to the detailed instructions in the **[Owner's Guide](./OWNERS_GUIDE.md)**.
 
-- Python 3.7+
-- pip (Python package installer)
+---
 
-### Installation & Setup
+## Technical Stack
 
-1.  **Clone the repository:**
-    ```bash
-    git clone <repository_url>
-    cd <repository_directory>
-    ```
-
-2.  **Create a virtual environment (recommended):**
-    ```bash
-    python -m venv venv
-    source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
-    ```
-
-3.  **Install the dependencies:**
-    The `requirements.txt` file contains all necessary Python packages.
-    ```bash
-    pip install -r requirements.txt
-    ```
-
-### Running the Application
-
-This is a Flask application. Once the dependencies are installed, you can run it using the following command:
-
-```bash
-flask run
-```
-
-The application will start, and you can access it by navigating to `http://127.0.0.1:5000` in your web browser.
-
-### Deployment
-
-For instructions on how to deploy this application to a live web server, please see the [Deployment Guide](DEPLOYMENT.md).
-
-## Application Structure
-
-- `app.py`: The main Flask application file containing all routes and core logic.
-- `requirements.txt`: A list of all Python dependencies.
-- `uploads/`: A directory where uploaded data files are temporarily stored.
-- `utils/`: A package containing the modular backend logic:
-    - `data_ingestion.py`: Handles loading data from all sources.
-    - `data_cleaning.py`: Contains functions for all data cleaning operations.
-    - `data_engineering.py`: Contains functions for feature engineering tasks.
-    - `eda.py`: Contains functions for generating all EDA plots.
-- `templates/`: A directory containing all the HTML templates for the web interface.
-    - `base.html`: The main layout template with the navigation and progress bar.
-    - Other `.html` files correspond to the different pages/stages of the application.
+-   **Backend:** Python, Flask, Dask, Pandas, Scikit-learn, SHAP, Category Encoders
+-   **Frontend:** HTML, Bootstrap 5, JavaScript
+-   **Deployment:** Gunicorn

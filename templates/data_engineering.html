@@ -1,147 +1,188 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="row">
-    <div class="col-md-12">
-        <h2 class="mb-4">Data and Feature Engineering</h2>
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <h2>Feature Engineering</h2>
+            <p>Create new features, encode categorical variables, and scale your data.</p>
+        </div>
     </div>
+
+    <div class="row mt-3">
+        <!-- Create New Feature -->
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header"><h4>Create Feature from Columns</h4></div>
+                <div class="card-body">
+                    <form action="{{ url_for('data_engineering') }}" method="post">
+                        <input type="hidden" name="action" value="create_new_feature">
+                        <div class="mb-3">
+                            <label class="form-label">Column 1</label>
+                            <select class="form-select" name="col1" required>{% for c in columns %}<option value="{{c}}">{{c}}</option>{% endfor %}</select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Column 2</label>
+                            <select class="form-select" name="col2" required>{% for c in columns %}<option value="{{c}}">{{c}}</option>{% endfor %}</select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Operation</label>
+                            <select class="form-select" name="operation" required>
+                                <option value="add">Add</option>
+                                <option value="subtract">Subtract</option>
+                                <option value="multiply">Multiply</option>
+                                <option value="divide">Divide</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">New Column Name</label>
+                            <input type="text" class="form-control" name="new_col_name" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Create Feature</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Apply Encoding -->
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header"><h4>Apply Encoding</h4></div>
+                <div class="card-body">
+                    <form action="{{ url_for('data_engineering') }}" method="post">
+                        <input type="hidden" name="action" value="apply_encoding">
+                        <div class="mb-3">
+                            <label for="encoding_column" class="form-label">Categorical Column</label>
+                            <select class="form-select" name="column" id="encoding_column" required>
+                                {% for c in columns %}<option value="{{c}}">{{c}}</option>{% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="encoding_type" class="form-label">Encoding Type</label>
+                            <select class="form-select" name="encoding_type" id="encoding_type" required>
+                                <option value="one-hot">One-Hot</option>
+                                <option value="label">Label</option>
+                                <option value="ordinal">Ordinal</option>
+                                <option value="target">Target</option>
+                            </select>
+                        </div>
+                        <div class="mb-3" id="target-column-wrapper" style="display: none;">
+                            <label for="target_column_encoding" class="form-label">Target Column</label>
+                            <select class="form-select" name="target_column_encoding" id="target_column_encoding">
+                                 {% for c in columns %}<option value="{{c}}">{{c}}</option>{% endfor %}
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Apply Encoding</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bin Column -->
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header"><h4>Bin Numeric Column</h4></div>
+                <div class="card-body">
+                    <form action="{{ url_for('data_engineering') }}" method="post">
+                        <input type="hidden" name="action" value="bin_column">
+                        <div class="mb-3">
+                            <label class="form-label">Column to Bin</label>
+                            <select class="form-select" name="column" required>
+                                {% for c in columns %}{% if df[c].dtype in ['int64', 'float64'] %}<option value="{{c}}">{{c}}</option>{% endif %}{% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Number of Bins</label>
+                            <input type="number" class="form-control" name="bins" value="5" min="2" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Create Bins</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-3">
+        <!-- Scale Features -->
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header"><h4>Scale Numerical Features</h4></div>
+                <div class="card-body">
+                    <form action="{{ url_for('data_engineering') }}" method="post">
+                        <input type="hidden" name="action" value="scale_features">
+                        <div class="mb-3">
+                            <label for="scale_columns" class="form-label">Columns to Scale</label>
+                            <select multiple class="form-select" name="scale_columns[]" required>
+                                {% for c in columns %}{% if df[c].dtype in ['int64', 'float64'] %}<option value="{{c}}">{{c}}</option>{% endif %}{% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="scaler_type" class="form-label">Scaler Type</label>
+                            <select class="form-select" name="scaler_type">
+                                <option value="standard">Standard Scaler</option>
+                                <option value="minmax">Min-Max Scaler</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Scale</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Polynomial Features -->
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header"><h4>Create Polynomial/Interaction Features</h4></div>
+                <div class="card-body">
+                    <form action="{{ url_for('data_engineering') }}" method="post">
+                        <input type="hidden" name="action" value="create_polynomial_features">
+                        <div class="mb-3">
+                            <label for="poly_column" class="form-label">Numerical Column</label>
+                            <select class="form-select" name="poly_column" required>
+                                {% for c in columns %}{% if df[c].dtype in ['int64', 'float64'] %}<option value="{{c}}">{{c}}</option>{% endif %}{% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="poly_degree" class="form-label">Degree</label>
+                            <input type="number" class="form-control" name="poly_degree" value="2" min="2">
+                        </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" name="poly_interaction_only" id="poly_interaction_only">
+                            <label class="form-check-label" for="poly_interaction_only">
+                                Interaction Only
+                            </label>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Create Features</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% include 'data_viewer.html' %}
 </div>
+{% endblock %}
 
-<div class="row">
-    <div class="col-md-4 mb-4">
-        <div class="card">
-            <div class="card-header">
-                Create New Feature
-            </div>
-            <div class="card-body">
-                <form action="{{ url_for('data_engineering') }}" method="POST">
-                    <input type="hidden" name="action" value="create_new_feature">
-                    <div class="mb-3">
-                        <label for="col1" class="form-label">Column 1</label>
-                        <select class="form-control" id="col1" name="col1" required>
-                            <option value="" disabled selected>Select a column</option>
-                            {% for column in columns %}
-                                <option value="{{ column }}">{{ column }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="col2" class="form-label">Column 2</label>
-                        <select class="form-control" id="col2" name="col2" required>
-                            <option value="" disabled selected>Select a column</option>
-                            {% for column in columns %}
-                                <option value="{{ column }}">{{ column }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="operation" class="form-label">Operation</label>
-                        <select class="form-control" id="operation" name="operation" required>
-                            <option value="" disabled selected>Select an operation</option>
-                            <option value="add">Add (+)</option>
-                            <option value="subtract">Subtract (-)</option>
-                            <option value="multiply">Multiply (*)</option>
-                            <option value="divide">Divide (/)</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="new_col_name" class="form-label">New Column Name</label>
-                        <input type="text" class="form-control" id="new_col_name" name="new_col_name" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Create Feature</button>
-                </form>
-            </div>
-        </div>
-    </div>
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const encodingTypeSelect = document.getElementById('encoding_type');
+    const targetColumnWrapper = document.getElementById('target-column-wrapper');
+    const targetColumnSelect = document.getElementById('target_column_encoding');
 
-    <div class="col-md-4 mb-4">
-        <div class="card">
-            <div class="card-header">
-                Apply Encoding
-            </div>
-            <div class="card-body">
-                <form action="{{ url_for('data_engineering') }}" method="POST">
-                    <input type="hidden" name="action" value="apply_encoding">
-                    <div class="mb-3">
-                        <label for="encoding_columns" class="form-label">Columns (Select multiple)</label>
-                        <select class="form-control" id="encoding_columns" name="columns[]" multiple required>
-                            {% for column in columns %}
-                                <option value="{{ column }}">{{ column }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="encoding_type" class="form-label">Encoding Type</label>
-                        <select class="form-control" id="encoding_type" name="encoding_type" required>
-                            <option value="" disabled selected>Select a type</option>
-                            <option value="one_hot">One-Hot Encoding</option>
-                            <option value="label">Label Encoding</option>
-                            <option value="ordinal">Ordinal Encoding</option>
-                            <option value="frequency">Frequency Encoding</option>
-                        </select>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Apply Encoding</button>
-                </form>
-            </div>
-        </div>
-    </div>
+    function toggleTargetColumn() {
+        if (encodingTypeSelect.value === 'target') {
+            targetColumnWrapper.style.display = 'block';
+            targetColumnSelect.required = true;
+        } else {
+            targetColumnWrapper.style.display = 'none';
+            targetColumnSelect.required = false;
+        }
+    }
 
-    <div class="col-md-4 mb-4">
-        <div class="card">
-            <div class="card-header">
-                Bin Column
-            </div>
-            <div class="card-body">
-                <form action="{{ url_for('data_engineering') }}" method="POST">
-                    <input type="hidden" name="action" value="bin_column">
-                    <div class="mb-3">
-                        <label for="bin_column" class="form-label">Numeric Column to Bin</label>
-                        <select class="form-control" id="bin_column" name="column" required>
-                            <option value="" disabled selected>Select a column</option>
-                            {% for column in columns %}
-                                <option value="{{ column }}">{{ column }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="num_bins" class="form-label">Number of Bins</label>
-                        <input type="number" class="form-control" id="num_bins" name="num_bins" min="2" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="bin_labels" class="form-label">Custom Labels (Optional, comma-separated)</label>
-                        <input type="text" class="form-control" id="bin_labels" name="labels" placeholder="e.g., Small, Medium, Large">
-                    </div>
-                    <div class="mb-3">
-                        <label for="new_bin_col_name" class="form-label">New Column Name (Optional)</label>
-                        <input type="text" class="form-control" id="new_bin_col_name" name="new_col_name">
-                    </div>
-                    <button type="submit" class="btn btn-primary">Apply Binning</button>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="row">
-    <div class="col-md-12">
-        <div class="card">
-            <div class="card-header">
-                Current Data
-            </div>
-            <div class="card-body">
-                {% if error %}
-                    <div class="alert alert-danger">{{ error }}</div>
-                {% endif %}
-                {% if success %}
-                    <div class="alert alert-success">{{ success }}</div>
-                {% endif %}
-                {% if data_viewer %}
-                    {{ data_viewer|safe }}
-                {% else %}
-                    <p>No data to display. Please import a dataset first.</p>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-</div>
+    encodingTypeSelect.addEventListener('change', toggleTargetColumn);
+    // Initial check
+    toggleTargetColumn();
+});
+</script>
 {% endblock %}

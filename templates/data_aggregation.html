@@ -2,46 +2,145 @@
 
 {% block content %}
 <div class="container mt-4">
-    <h2>Data Aggregation</h2>
-    <p>Group your data and apply an aggregation function.</p>
-
-    <div class="card mb-4">
-        <div class="card-header">
-            <h4>Group By & Aggregate</h4>
+    <div class="row">
+        <div class="col-md-12">
+            <h2>Data Aggregation & Pivoting</h2>
+            <p>Summarize your data using group-by operations or restructure it with a pivot table.</p>
         </div>
-        <div class="card-body">
-            <form action="{{ url_for('data_aggregation') }}" method="post">
-                <div class="mb-3">
-                    <label for="group_by_cols" class="form-label">Group By Columns (Select multiple)</label>
-                    <select multiple class="form-control" id="group_by_cols" name="group_by_cols[]" required>
-                        {% for column in columns %}
-                        <option value="{{ column }}">{{ column }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="mb-3">
-                    <label for="agg_col" class="form-label">Aggregation Column</label>
-                    <select class="form-control" id="agg_col" name="agg_col" required>
-                        {% for column in columns %}
-                        <option value="{{ column }}">{{ column }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="mb-3">
-                    <label for="agg_func" class="form-label">Aggregation Function</label>
-                    <select class="form-control" id="agg_func" name="agg_func" required>
-                        <option value="mean">Mean</option>
-                        <option value="median">Median</option>
-                        <option value="sum">Sum</option>
-                        <option value="count">Count</option>
-                        <option value="min">Min</option>
-                        <option value="max">Max</option>
-                    </select>
-                </div>
-                <button type="submit" class="btn btn-primary">Apply</button>
-            </form>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <ul class="nav nav-tabs mt-3" id="aggregationTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="groupby-tab" data-bs-toggle="tab" data-bs-target="#groupby" type="button" role="tab" aria-controls="groupby" aria-selected="true">Group By & Aggregate</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="pivot-tab" data-bs-toggle="tab" data-bs-target="#pivot" type="button" role="tab" aria-controls="pivot" aria-selected="false">Pivot Table</button>
+        </li>
+    </ul>
+
+    <!-- Tab Content -->
+    <div class="tab-content" id="aggregationTabsContent">
+        <!-- Group By Tab -->
+        <div class="tab-pane fade show active" id="groupby" role="tabpanel" aria-labelledby="groupby-tab">
+            <div class="card card-body mt-3">
+                <form action="{{ url_for('data_aggregation') }}" method="post">
+                    <input type="hidden" name="action" value="group_by">
+                    <div class="row">
+                        <div class="col-md-12">
+                            <h5>Group By Columns</h5>
+                            <div class="mb-3">
+                                <label for="group_by_cols" class="form-label">Select columns to group by:</label>
+                                <select multiple class="form-select" id="group_by_cols" name="group_by_cols[]" required>
+                                    {% for column in columns %}<option value="{{ column }}">{{ column }}</option>{% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <hr>
+                    <h5>Aggregations</h5>
+                    <div id="aggregation-rules-container">
+                        <!-- Aggregation rows will be added here by JS -->
+                    </div>
+                    <button type="button" class="btn btn-outline-secondary btn-sm mt-2" id="add-aggregation-rule">Add Aggregation Rule</button>
+                    <hr>
+                    <button type="submit" class="btn btn-primary mt-3 w-100">Apply GroupBy</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Pivot Table Tab -->
+        <div class="tab-pane fade" id="pivot" role="tabpanel" aria-labelledby="pivot-tab">
+            <div class="card card-body mt-3">
+                <form action="{{ url_for('data_aggregation') }}" method="post">
+                    <input type="hidden" name="action" value="pivot">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <label for="pivot_index" class="form-label">Index</label>
+                            <select multiple class="form-select" name="pivot_index[]" required>{% for c in columns %}<option value="{{c}}">{{c}}</option>{% endfor %}</select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="pivot_columns" class="form-label">Columns</label>
+                            <select multiple class="form-select" name="pivot_columns[]" required>{% for c in columns %}<option value="{{c}}">{{c}}</option>{% endfor %}</select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="pivot_values" class="form-label">Values</label>
+                            <select multiple class="form-select" name="pivot_values[]" required>{% for c in columns %}<option value="{{c}}">{{c}}</option>{% endfor %}</select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="pivot_aggfunc" class="form-label">Function</label>
+                            <select class="form-select" name="pivot_aggfunc" required>
+                                <option value="mean">Mean</option>
+                                <option value="sum">Sum</option>
+                                <option value="count">Count</option>
+                                <option value="std">Standard Deviation</option>
+                                <option value="var">Variance</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary mt-3 w-100">Create Pivot Table</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-md-12">
+            {% include 'data_viewer.html' %}
         </div>
     </div>
 </div>
-{% include 'data_viewer.html' %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const container = document.getElementById('aggregation-rules-container');
+    const addButton = document.getElementById('add-aggregation-rule');
+    const columns = {{ columns|tojson }};
+    let ruleIndex = 0;
+
+    function createAggregationRule() {
+        const ruleDiv = document.createElement('div');
+        ruleDiv.classList.add('row', 'mb-2', 'align-items-center');
+        ruleDiv.innerHTML = `
+            <div class="col-md-5">
+                <select class="form-select" name="agg_col[]" required>
+                    <option value="" disabled selected>Select column to aggregate</option>
+                    ${columns.map(c => `<option value="${c}">${c}</option>`).join('')}
+                </select>
+            </div>
+            <div class="col-md-5">
+                <select class="form-select" name="agg_func[]" required>
+                    <option value="sum">Sum</option>
+                    <option value="mean">Mean</option>
+                    <option value="count">Count</option>
+                    <option value="size">Size</option>
+                    <option value="nunique">Unique Count</option>
+                    <option value="min">Min</option>
+                    <option value="max">Max</option>
+                    <option value="std">Std Dev</option>
+                    <option value="var">Variance</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="button" class="btn btn-danger btn-sm w-100 remove-rule-btn">Remove</button>
+            </div>
+        `;
+        container.appendChild(ruleDiv);
+        ruleIndex++;
+    }
+
+    container.addEventListener('click', function(e) {
+        if (e.target.classList.contains('remove-rule-btn')) {
+            e.target.closest('.row').remove();
+        }
+    });
+
+    addButton.addEventListener('click', createAggregationRule);
+
+    // Add one rule to start with
+    createAggregationRule();
+});
+</script>
 {% endblock %}

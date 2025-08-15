@@ -2,6 +2,7 @@
 
 import pandas as pd
 import numpy as np
+from sklearn.impute import KNNImputer
 
 def handle_missing_values(df, columns, strategy):
     """
@@ -152,3 +153,111 @@ def standardize_text(df, columns):
         if pd.api.types.is_string_dtype(df_cleaned[col]):
             df_cleaned[col] = df_cleaned[col].str.lower().str.strip()
     return df_cleaned, None
+
+def handle_outliers_iqr(df, columns, strategy='remove', multiplier=1.5):
+    """
+    Handles outliers in numerical columns using the Interquartile Range (IQR) method.
+
+    Technical: Calculates the IQR (Q3 - Q1) for each specified column. Outliers are
+    identified as data points that fall below Q1 - 1.5*IQR or above Q3 + 1.5*IQR.
+    The function can either remove these rows or cap the values at the outlier boundaries.
+
+    Layman: This function finds and deals with extreme values (outliers) in your data.
+    You can choose to either completely remove the rows containing these outliers or
+    replace the outlier values with the nearest "normal" value.
+
+    Args:
+        df (pd.DataFrame): The input DataFrame.
+        columns (list): A list of numerical column names to process.
+        strategy (str): The strategy to handle outliers ('remove' or 'cap').
+        multiplier (float): The IQR multiplier to determine outlier boundaries.
+
+    Returns:
+        tuple: A tuple containing the new DataFrame and an error message (if any).
+    """
+    df_cleaned = df.copy()
+    for col in columns:
+        if col not in df_cleaned.columns or not pd.api.types.is_numeric_dtype(df_cleaned[col]):
+            return None, f"Error: Column '{col}' is not a valid numerical column."
+
+        Q1 = df_cleaned[col].quantile(0.25)
+        Q3 = df_cleaned[col].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - multiplier * IQR
+        upper_bound = Q3 + multiplier * IQR
+
+        if strategy == 'remove':
+            df_cleaned = df_cleaned[(df_cleaned[col] >= lower_bound) & (df_cleaned[col] <= upper_bound)]
+        elif strategy == 'cap':
+            df_cleaned[col] = np.where(df_cleaned[col] < lower_bound, lower_bound, df_cleaned[col])
+            df_cleaned[col] = np.where(df_cleaned[col] > upper_bound, upper_bound, df_cleaned[col])
+        else:
+            return None, "Error: Invalid strategy. Choose 'remove' or 'cap'."
+
+    return df_cleaned, None
+
+def apply_regex_cleaning(df, column, pattern, replacement):
+    """
+    Cleans a text column using a regular expression.
+
+    Technical: Uses pandas' `str.replace()` method with `regex=True`. This allows for
+    finding and replacing substrings in a column based on a specified regex pattern.
+
+    Layman: This is an advanced "find and replace" for your text data. You can use it
+    to clean up complex text patterns, like removing special characters or extracting
+    specific parts of the text.
+
+    Args:
+        df (pd.DataFrame): The input DataFrame.
+        column (str): The name of the text column to clean.
+        pattern (str): The regex pattern to search for.
+        replacement (str): The string to replace the matched pattern with.
+
+    Returns:
+        tuple: A tuple containing the new DataFrame and an error message (if any).
+    """
+    df_cleaned = df.copy()
+    if column not in df_cleaned.columns or not pd.api.types.is_string_dtype(df_cleaned[column]):
+        return None, f"Error: Column '{column}' is not a valid text column."
+
+    try:
+        df_cleaned[column] = df_cleaned[column].str.replace(pattern, replacement, regex=True)
+    except Exception as e:
+        return None, f"Error applying regex: {e}"
+
+    return df_cleaned, None
+
+def impute_knn(df, columns, n_neighbors=5):
+    """
+    Imputes missing values using K-Nearest Neighbors.
+
+    Technical: Utilizes scikit-learn's `KNNImputer`. This method models each feature
+    with missing values as a function of other features, and imputes missing values
+    based on the values of the k-nearest neighbors in the dataset.
+
+    Layman: This is a smart way to fill in missing values. Instead of just using the
+    average, it looks at similar data points (neighbors) to make an educated guess
+    about what the missing value should be.
+
+    Args:
+        df (pd.DataFrame): The input DataFrame.
+        columns (list): A list of numerical column names to impute.
+        n_neighbors (int): The number of neighbors to use for imputation.
+
+    Returns:
+        tuple: A tuple containing the new DataFrame and an error message (if any).
+    """
+    df_imputed = df.copy()
+
+    numerical_cols = df_imputed[columns].select_dtypes(include=np.number).columns.tolist()
+    if len(numerical_cols) != len(columns):
+        return None, "Error: All columns for KNN imputation must be numerical."
+
+    try:
+        imputer = KNNImputer(n_neighbors=n_neighbors)
+        # The imputer returns a numpy array, so we need to put it back into a DataFrame
+        df_imputed[numerical_cols] = imputer.fit_transform(df_imputed[numerical_cols])
+    except Exception as e:
+        return None, f"Error during KNN imputation: {e}"
+
+    return df_imputed, None

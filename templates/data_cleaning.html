@@ -106,6 +106,100 @@
             </div>
         </div>
     </div>
+
+    <div class="row mt-2">
+        <div class="col-md-12">
+            <h3 class="mt-4">Advanced Cleaning</h3>
+        </div>
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4>Handle Outliers (IQR)</h4>
+                </div>
+                <div class="card-body">
+                    <form action="{{ url_for('data_cleaning') }}" method="post">
+                        <input type="hidden" name="action" value="handle_outliers_iqr">
+                        <div class="mb-3">
+                            <label for="outlier_columns" class="form-label">Numerical Columns</label>
+                            <select multiple class="form-control" id="outlier_columns" name="columns[]" required>
+                                {% for column in columns %}
+                                {% if df[column].dtype in ['int64', 'float64'] %}
+                                <option value="{{ column }}">{{ column }}</option>
+                                {% endif %}
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="outlier_strategy" class="form-label">Strategy</label>
+                            <select class="form-control" id="outlier_strategy" name="outlier_strategy">
+                                <option value="remove">Remove Outliers</option>
+                                <option value="cap">Cap Outliers</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Apply</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4>Apply Regex Cleaning</h4>
+                </div>
+                <div class="card-body">
+                    <form action="{{ url_for('data_cleaning') }}" method="post">
+                        <input type="hidden" name="action" value="apply_regex_cleaning">
+                        <div class="mb-3">
+                            <label for="regex_column" class="form-label">Text Column</label>
+                            <select class="form-control" id="regex_column" name="regex_column" required>
+                                {% for column in columns %}
+                                {% if df[column].dtype == 'object' %}
+                                <option value="{{ column }}">{{ column }}</option>
+                                {% endif %}
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="regex_pattern" class="form-label">Regex Pattern</label>
+                            <input type="text" class="form-control" id="regex_pattern" name="regex_pattern" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="regex_replacement" class="form-label">Replacement String</label>
+                            <input type="text" class="form-control" id="regex_replacement" name="regex_replacement" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Apply</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4>Impute with KNN</h4>
+                </div>
+                <div class="card-body">
+                    <form action="{{ url_for('data_cleaning') }}" method="post">
+                        <input type="hidden" name="action" value="impute_knn">
+                        <div class="mb-3">
+                            <label for="knn_columns" class="form-label">Numerical Columns</label>
+                            <select multiple class="form-control" id="knn_columns" name="columns[]" required>
+                                {% for column in columns %}
+                                {% if df[column].dtype in ['int64', 'float64'] %}
+                                <option value="{{ column }}">{{ column }}</option>
+                                {% endif %}
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="n_neighbors" class="form-label">Number of Neighbors (k)</label>
+                            <input type="number" class="form-control" id="n_neighbors" name="n_neighbors" value="5" min="1" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Apply</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 {% include 'data_viewer.html' %}
 {% endblock %}

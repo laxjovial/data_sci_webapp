@@ -1,33 +1,26 @@
 # utils/data_ingestion.py
+import dask.dataframe as dd
 import pandas as pd
 import requests
 import io
 import re
-import urllib.parse
 import os
 
+def _get_file_extension(path):
+    """Extracts the file extension from a path or URL."""
+    try:
+        # For URLs, strip query parameters first
+        if '?' in path:
+            path = path.split('?')[0]
+        return os.path.splitext(path)[1].lower()
+    except:
+        return ""
+
 def _convert_gdrive_url(url):
-    """
-    Converts a standard Google Drive sharing URL into a direct download URL.
-    This works for both Google Sheets and uploaded files.
+    """Converts a Google Drive sharing URL into a direct download URL."""
+    gdrive_sheets_pattern = r'https://docs\.google\.com/spreadsheets/d/([a-zA-Z0-9_-]+)/edit#gid=(\d+)'
+    gdrive_file_pattern = r'https://drive\.google\.com/file/d/([a-zA-Z0-9_-]+)/view'
     
-    Technical: The function detects different Google Drive URL formats (e.g., 
-    docs.google.com/spreadsheets or drive.google.com/file) and transforms them
-    into a format that forces a direct download. This bypasses the preview page
-    that a regular shared link would open.
-
-    Args:
-        url (str): The original Google Drive URL.
-
-    Returns:
-        str: The converted direct download URL.
-    """
-    # Pattern for Google Sheets
-    gdrive_sheets_pattern = r'https:\/\/docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9_-]+)\/edit#gid=(\d+)'
-    
-    # Pattern for uploaded files in Google Drive
-    gdrive_file_pattern = r'https:\/\/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)\/view'
-
     sheets_match = re.search(gdrive_sheets_pattern, url)
     file_match = re.search(gdrive_file_pattern, url)
     
@@ -35,28 +28,29 @@ def _convert_gdrive_url(url):
         doc_id = sheets_match.group(1)
         gid = sheets_match.group(2)
         return f'https://docs.google.com/spreadsheets/d/{doc_id}/export?format=csv&gid={gid}'
-    
     elif file_match:
         file_id = file_match.group(1)
         return f'https://drive.google.com/uc?id={file_id}&export=download'
-    
     return url
 
-def load_data(source_type, source_path_or_file):
+def load_data(source_path_or_file, source_type='upload', file_type=None, delimiter=',', encoding='utf-8'):
     """
-    Loads a dataset from a file path or URL.
+    Loads a dataset from a file path or URL, with support for multiple file types.
 
-    Technical: The function handles different sources. For 'upload', it reads
-    the file from a local path. For 'url', it makes an HTTP GET request,
-    then uses pandas' read_csv() to parse the content directly from a
-    text stream.
+    Technical: Infers the file type from the file extension if not explicitly provided.
+    Uses the appropriate pandas read function (read_csv, read_excel, read_json, read_parquet)
+    to load the data. For URLs, it first downloads the content into an in-memory buffer.
 
-    Layman: This is the "open file" button for your application. It can
-    read data from a file you've uploaded or a link you've provided.
+    Layman: This function opens your data file, whether it's on your computer or from a web link.
+    It can automatically figure out if it's a CSV, Excel, JSON, or Parquet file and read it correctly.
 
     Args:
+        source_path_or_file (str or file-like object): The local file path, URL, or uploaded file object.
         source_type (str): The source of the data ('upload', 'url').
-        source_path_or_file (str): The local file path or the URL to the data.
+        file_type (str, optional): The type of file ('csv', 'excel', 'json', 'parquet').
+                                   If None, it will be inferred from the filename.
+        delimiter (str, optional): The delimiter to use for CSV files. Defaults to ','.
+        encoding (str, optional): The encoding to use for text-based files. Defaults to 'utf-8'.
 
     Returns:
         tuple: A tuple containing the loaded DataFrame and an error message (if any).
@@ -64,37 +58,63 @@ def load_data(source_type, source_path_or_file):
     df = None
     error = None
 
-    if source_type == 'upload':
-        try:
-            # Assuming CSV for now, but could be extended to other formats
-            df = pd.read_csv(source_path_or_file)
-        except FileNotFoundError:
-            error = f"Error: File not found at {source_path_or_file}."
-        except Exception as e:
-            error = f"Error reading file: {e}"
-            
-    elif source_type == 'url':
-        url = _convert_gdrive_url(source_path_or_file)
-        try:
-            response = requests.get(url, timeout=10)
-            response.raise_for_status()
-            
-            # Check if the response content is a zip file
-            if 'zip' in response.headers.get('Content-Type', ''):
-                return None, "Error: The provided URL points to a zip file. Please provide a direct link to a data file like CSV or Excel."
-                
-            file_content = io.StringIO(response.text)
-            # Try to infer the file type, assuming CSV if not specified
-            df = pd.read_csv(file_content)
+    try:
+        if not file_type:
+            file_type = _get_file_extension(source_path_or_file)
 
-        except requests.exceptions.RequestException as e:
-            error = f"Error accessing URL: {e}"
-        except pd.errors.ParserError as e:
-            error = f"Error parsing data from URL: {e}. Please ensure the URL points to a valid CSV file."
-        except Exception as e:
-            error = f"An unexpected error occurred: {e}"
-            
-    else:
-        error = f"Error: Invalid source type '{source_type}'."
-        
+        # Standardize file type string
+        if file_type.startswith('.'):
+            file_type = file_type[1:]
+
+        # Prepare the data stream/path based on the source type
+        if source_type == 'url':
+            url = _convert_gdrive_url(source_path_or_file)
+            response = requests.get(url, timeout=20)
+            response.raise_for_status()
+            data_stream = io.BytesIO(response.content)
+            # For text-based formats, we might need a string buffer
+            if file_type in ['csv', 'json']:
+                 data_stream = io.StringIO(response.text)
+        else: # 'upload'
+            data_stream = source_path_or_file
+
+        # Read the data based on file type
+        if file_type == 'csv':
+            df = dd.read_csv(data_stream, delimiter=delimiter, encoding=encoding, blocksize=None)
+        elif file_type in ['xls', 'xlsx']:
+            # Dask does not have a direct excel reader, so we read with pandas and convert
+            pandas_df = pd.read_excel(data_stream)
+            df = dd.from_pandas(pandas_df, npartitions=2)
+        elif file_type == 'json':
+            df = dd.read_json(data_stream, encoding=encoding, blocksize=None)
+        elif file_type == 'parquet':
+            df = dd.read_parquet(data_stream)
+        else:
+            # As a fallback, try reading as CSV, as it's the most common format
+            try:
+                if source_type == 'url':
+                    # Reset stream if already read
+                    data_stream.seek(0)
+                df = pd.read_csv(data_stream, delimiter=delimiter, encoding=encoding)
+                error = f"Warning: File type '{file_type}' not explicitly supported. Attempted to read as CSV."
+            except Exception as fallback_e:
+                error = f"Error: Unsupported file type '{file_type}'. Could not read as CSV either. Details: {fallback_e}"
+
+    except requests.exceptions.RequestException as e:
+        error = f"Error accessing URL: {e}"
+    except pd.errors.ParserError as e:
+        error = f"Error parsing data. Please check the file format and parameters like delimiter. Details: {e}"
+    except FileNotFoundError:
+        error = f"Error: File not found at {source_path_or_file}."
+    except Exception as e:
+        error = f"An unexpected error occurred during data ingestion: {e}"
+
+    # If there was a warning but the df was loaded, return both
+    if df is not None and error and "Warning" in error:
+        return df, error
+
+    # If there was a hard error, df should be None
+    if error and "Error" in error:
+        df = None
+
     return df, error

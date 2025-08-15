@@ -1,127 +1,123 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="row">
-    <div class="col-md-12">
-        <h2 class="mb-4">Exploratory Data Analysis (EDA)</h2>
-    </div>
-</div>
+<div class="container mt-4">
+    <h2>Exploratory Data Analysis (EDA)</h2>
+    <p>Explore your data from different perspectives. Start with the automated report for a quick overview.</p>
 
-<div class="row">
-    <div class="col-md-6 mb-4">
-        <div class="card">
-            <div class="card-header">
-                Univariate Plotting
+    <ul class="nav nav-tabs mt-3" id="edaTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="report-tab" data-bs-toggle="tab" data-bs-target="#report" type="button" role="tab">Automated Report</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="univariate-tab" data-bs-toggle="tab" data-bs-target="#univariate" type="button" role="tab">Univariate</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="bivariate-tab" data-bs-toggle="tab" data-bs-target="#bivariate" type="button" role="tab">Bivariate</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="multivariate-tab" data-bs-toggle="tab" data-bs-target="#multivariate" type="button" role="tab">Multivariate</button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="edaTabsContent">
+        <!-- Automated Report -->
+        <div class="tab-pane fade show active" id="report" role="tabpanel">
+            <div class="card card-body mt-3">
+                {{ report_html|safe }}
             </div>
-            <div class="card-body">
-                <form action="{{ url_for('data_eda') }}" method="POST">
-                    <input type="hidden" name="action" value="univariate_plot">
-                    <div class="mb-3">
-                        <label for="uni_column" class="form-label">Column</label>
-                        <select class="form-control" id="uni_column" name="column" required>
-                            <option value="" disabled selected>Select a column</option>
-                            {% for column in columns %}
-                                <option value="{{ column }}">{{ column }}</option>
-                            {% endfor %}
-                        </select>
+        </div>
+
+        <!-- Univariate -->
+        <div class="tab-pane fade" id="univariate" role="tabpanel">
+            <div class="card card-body mt-3">
+                <form action="{{ url_for('data_eda') }}" method="post">
+                    <input type="hidden" name="plot_type" value="univariate">
+                    <div class="row align-items-end">
+                        <div class="col-md-5">
+                            <label class="form-label">Column</label>
+                            <select name="uni_column" class="form-select">{% for c in columns %}<option value="{{c}}">{{c}}</option>{% endfor %}</select>
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label">Plot Type</label>
+                            <select name="uni_plot_type" class="form-select">
+                                <option value="histogram">Histogram</option>
+                                <option value="violin">Violin Plot</option>
+                                <option value="pie">Pie Chart</option>
+                                <option value="bar">Bar Chart</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-primary w-100">Generate</button>
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label for="uni_plot_type" class="form-label">Plot Type</label>
-                        <select class="form-control" id="uni_plot_type" name="plot_type" required>
-                            <option value="histogram">Histogram</option>
-                            <option value="pie">Pie Chart</option>
-                            <option value="violin">Violin Plot</option>
-                        </select>
+                </form>
+            </div>
+        </div>
+
+        <!-- Bivariate -->
+        <div class="tab-pane fade" id="bivariate" role="tabpanel">
+            <div class="card card-body mt-3">
+                <form action="{{ url_for('data_eda') }}" method="post">
+                    <input type="hidden" name="plot_type" value="bivariate">
+                     <div class="row align-items-end">
+                        <div class="col-md-3"><label class="form-label">X-Axis</label><select name="bi_x_col" class="form-select">{% for c in columns %}<option value="{{c}}">{{c}}</option>{% endfor %}</select></div>
+                        <div class="col-md-3"><label class="form-label">Y-Axis</label><select name="bi_y_col" class="form-select">{% for c in columns %}<option value="{{c}}">{{c}}</option>{% endfor %}</select></div>
+                        <div class="col-md-4"><label class="form-label">Plot Type</label><select name="bi_plot_type" class="form-select"><option value="scatter">Scatter</option><option value="line">Line</option><option value="bar">Bar</option></select></div>
+                        <div class="col-md-2"><button type="submit" class="btn btn-primary w-100">Generate</button></div>
                     </div>
-                    <div class="mb-3">
-                        <label for="uni_color" class="form-label">Color (Optional)</label>
-                        <select class="form-control" id="uni_color" name="color">
-                            <option value="">No Grouping</option>
-                            {% for column in columns %}
-                                <option value="{{ column }}">{{ column }}</option>
-                            {% endfor %}
-                        </select>
+                </form>
+            </div>
+        </div>
+
+        <!-- Multivariate -->
+        <div class="tab-pane fade" id="multivariate" role="tabpanel">
+            <div class="card card-body mt-3">
+                <form action="{{ url_for('data_eda') }}" method="post">
+                    <input type="hidden" name="plot_type" value="multivariate">
+                     <div class="row align-items-end">
+                        <div class="col-md-10"><label class="form-label">Plot Type</label><select name="multi_plot_type" class="form-select"><option value="correlation_heatmap">Correlation Heatmap</option><option value="pairplot">Pair Plot</option></select></div>
+                        <div class="col-md-2"><button type="submit" class="btn btn-primary w-100">Generate</button></div>
                     </div>
-                    <button type="submit" class="btn btn-primary">Generate Plot</button>
                 </form>
             </div>
         </div>
     </div>
 
-    <div class="col-md-6 mb-4">
-        <div class="card">
-            <div class="card-header">
-                Bivariate Plotting
-            </div>
-            <div class="card-body">
-                <form action="{{ url_for('data_eda') }}" method="POST">
-                    <input type="hidden" name="action" value="bivariate_plot">
-                    <div class="mb-3">
-                        <label for="bi_x_col" class="form-label">X-Axis Column</label>
-                        <select class="form-control" id="bi_x_col" name="x_col" required>
-                            <option value="" disabled selected>Select a column</option>
-                            {% for column in columns %}
-                                <option value="{{ column }}">{{ column }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="bi_y_col" class="form-label">Y-Axis Column</label>
-                        <select class="form-control" id="bi_y_col" name="y_col" required>
-                            <option value="" disabled selected>Select a column</option>
-                            {% for column in columns %}
-                                <option value="{{ column }}">{{ column }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="bi_plot_type" class="form-label">Plot Type</label>
-                        <select class="form-control" id="bi_plot_type" name="plot_type" required>
-                            <option value="scatter">Scatter Plot</option>
-                            <option value="box">Box Plot</option>
-                            <option value="violin">Violin Plot</option>
-                            <option value="heatmap">Heatmap</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="bi_color" class="form-label">Color (Optional)</label>
-                        <select class="form-control" id="bi_color" name="color">
-                            <option value="">No Grouping</option>
-                            {% for column in columns %}
-                                <option value="{{ column }}">{{ column }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Generate Plot</button>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="row">
-    <div class="col-md-12">
-        <div class="card">
-            <div class="card-header">
-                Generated Plot
-            </div>
-            <div class="card-body">
-                {% if error %}
-                    <div class="alert alert-danger">{{ error }}</div>
-                {% endif %}
-                <div id="plot-container">
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <h3>Plot Area</h3>
+            <div class="card">
+                <div class="card-body" id="plot-container">
                     {% if plot_json %}
-                    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-                    <script>
-                        var plot_data = JSON.parse('{{ plot_json | safe }}');
-                        Plotly.newPlot('plot-container', plot_data.data, plot_data.layout);
-                    </script>
+                        <!-- Plotly JSON will be rendered here -->
                     {% else %}
-                    <p>No plot to display yet. Please generate a plot using the forms above.</p>
+                        <p>Select options and click "Generate" to create a plot.</p>
                     {% endif %}
                 </div>
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const plotContainer = document.getElementById('plot-container');
+    const plotJson = '{{ plot_json|safe }}';
+
+    if (plotJson) {
+        try {
+            // Check if it's a plotly json
+            const plotData = JSON.parse(plotJson);
+            Plotly.newPlot(plotContainer, plotData.data, plotData.layout);
+        } catch (e) {
+            // If not a valid JSON, assume it's the base64 image HTML for heatmap
+            plotContainer.innerHTML = plotJson;
+        }
+    }
+});
+</script>
 {% endblock %}
