@@ -166,6 +166,60 @@ def data_cleaning():
     return render_template('data_cleaning.html', data_viewer=data_viewer, columns=columns)
 
 
+@app.route('/data_combining', methods=['GET', 'POST'])
+def data_combining():
+    df = load_df_from_session()
+    if df is None:
+        flash('Please ingest a primary dataset first.', 'warning')
+        return redirect(url_for('index'))
+
+    if request.method == 'POST':
+        if 'file_upload' not in request.files:
+            flash("No file part in the request.", 'danger')
+            return redirect(url_for('data_combining'))
+
+        file = request.files['file_upload']
+        if file.filename == '':
+            flash("No selected file.", 'danger')
+            return redirect(url_for('data_combining'))
+
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(file.filename))
+        file.save(filepath)
+
+        try:
+            # Load the new data to combine
+            new_df, error = load_data(filepath)
+            if error:
+                flash(error, 'danger')
+                return redirect(url_for('data_combining'))
+
+            # Get combining parameters from the form
+            method = request.form.get('method')
+            # You'll need to handle the other kwargs like 'on', 'how', etc., from the form
+            # For simplicity, this example assumes 'on' is a required form field.
+            on_column = request.form.get('on_column')
+
+            # Combine the DataFrames
+            combined_df, combine_error = combine_dataframes(df, new_df, method, on=on_column)
+
+            if combine_error:
+                flash(combine_error, 'danger')
+                return redirect(url_for('data_combining'))
+            
+            save_df_to_session(combined_df)
+            track_history(request.form.to_dict())
+            flash(f"DataFrames combined successfully using method: {method}!", 'success')
+
+        except Exception as e:
+            flash(f"An error occurred during data combining: {e}", 'danger')
+
+        return redirect(url_for('data_combining'))
+
+    columns = df.columns
+    data_viewer = generate_df_viewer(df.head())
+    return render_template('data_combining.html', data_viewer=data_viewer, columns=columns)
+
+
 @app.route('/data_filtering', methods=['GET', 'POST'])
 def data_filtering():
     df = load_df_from_session()
