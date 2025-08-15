@@ -174,6 +174,3 @@ def apply_regex_cleaning(df, column, pattern, replacement):
 
     return df_cleaned, None
     
-<br>
-
-This video discusses how to use the `merge()` function in Python, which is a core concept for combining data from multiple sources in a project like this one.
