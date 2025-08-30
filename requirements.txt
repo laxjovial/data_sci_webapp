@@ -24,3 +24,5 @@ nbformat
 
 # Other
 requests
+seaborn
+markdown
