@@ -3,7 +3,6 @@ Flask
 gunicorn
 
 # Data Handling and Manipulation
-dask[dataframe]
 pandas
 numpy
 pyarrow

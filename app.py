@@ -10,7 +10,6 @@ from threading import Timer
 from flask import Flask, render_template, request, redirect, url_for, session, send_file, flash
 from werkzeug.utils import secure_filename
 import pandas as pd
-import dask.dataframe as dd
 import plotly.graph_objs as go
 import plotly.express as px
 
@@ -67,32 +66,42 @@ def start_cleanup_scheduler():
 
 start_cleanup_scheduler()
 
-# --- Dask-aware Session Management ---
+# --- Pandas-aware Session Management ---
 def save_df_to_session(df, key='current_df_path'):
-    """Saves a Dask DataFrame to Parquet and stores the path in the session."""
+    """Saves a Pandas DataFrame to a Parquet file and stores the path in the session."""
     if df is not None:
-        dir_path = os.path.join(app.config['DATA_FOLDER'], f"{uuid.uuid4()}")
-        if key in session and session.get(key) and os.path.exists(session[key]):
-            shutil.rmtree(session[key])
-        df.to_parquet(dir_path)
-        session[key] = dir_path
+        # Use a file path instead of a directory path for pandas
+        file_path = os.path.join(app.config['DATA_FOLDER'], f"{uuid.uuid4()}.parquet")
+
+        # Clean up old data store if it exists
+        if key in session and session.get(key):
+            old_path = session[key]
+            if os.path.exists(old_path):
+                if os.path.isdir(old_path): # Old dask data was stored in a directory
+                    shutil.rmtree(old_path)
+                else: # New pandas data is stored in a file
+                    os.remove(old_path)
+
+        df.to_parquet(file_path)
+        session[key] = file_path
 
 def load_df_from_session(key='current_df_path'):
-    """Loads a Dask DataFrame from a path stored in the session."""
+    """Loads a Pandas DataFrame from a path stored in the session."""
     if key in session and session.get(key):
-        dir_path = session[key]
+        file_path = session[key]
         try:
-            df = dd.read_parquet(dir_path)
+            df = pd.read_parquet(file_path)
             return df
         except Exception as e:
             flash(f"Error loading DataFrame from path: {e}", "danger")
+            # Clear the invalid path from session
+            session.pop(key, None)
             return None
     return None
 
 def generate_df_viewer(df, num_rows=5):
-    """Helper function to generate an HTML table for viewing a Dask DataFrame."""
+    """Helper function to generate an HTML table for viewing a Pandas DataFrame."""
     if df is not None:
-        # Compute only the head for display
         return df.head(num_rows).to_html(classes=['table', 'table-striped', 'table-hover', 'table-responsive'], border=0)
     return None
 
@@ -112,21 +121,19 @@ def index():
 @app.route('/ingest_url', methods=['POST'])
 def ingest_url():
     """
-    Handles data ingestion from a URL, including Google Drive links.
+    Handles data ingestion from a URL, including Google Drive and GitHub links.
 
     This function processes a POST request containing a URL to a dataset.
     It uses the `load_data` utility function to download and load the data
-    as a Dask DataFrame. The process includes:
+    as a Pandas DataFrame. The process includes:
     1. Retrieving URL and optional parameters (file type, delimiter) from the form.
     2. Calling `load_data` with 'url' as the source type.
-    3. Storing the temporary file path returned by `load_data` to ensure it's
-       deleted after the data is loaded, which is a crucial step for resource management.
+    3. Since `load_data` now reads from memory, there's no temporary file to clean up.
     4. Handling potential errors from the download or data parsing.
-    5. Saving the successfully loaded Dask DataFrame to the Flask session.
+    5. Saving the successfully loaded Pandas DataFrame to the Flask session.
     6. Logging the ingestion event to the project's history.
     7. Providing user feedback via flashed messages.
     """
-    temp_file_path = None
     try:
         url = request.form.get('url_input')
         file_type = request.form.get('file_type')
@@ -137,7 +144,7 @@ def ingest_url():
             return redirect(url_for('index'))
 
         # Call the load_data function from the utils module
-        df, error, temp_file_path = load_data(url, source_type='url', file_type=file_type, delimiter=delimiter)
+        df, error, _ = load_data(url, source_type='url', file_type=file_type, delimiter=delimiter)
 
         if error:
             flash(error, 'danger')
@@ -147,7 +154,7 @@ def ingest_url():
             flash("Failed to load data from URL. Please check the URL and file type.", 'danger')
             return redirect(url_for('index'))
             
-        # Store the Dask DataFrame in the session
+        # Store the Pandas DataFrame in the session
         save_df_to_session(df)
         
         # Track the action in the project history
@@ -164,11 +171,6 @@ def ingest_url():
         # Catch any unexpected errors during the process
         flash(f"An unexpected error occurred during URL ingestion: {e}", 'danger')
     
-    finally:
-        # Clean up the temporary file if it was created
-        if temp_file_path and os.path.exists(temp_file_path):
-            os.remove(temp_file_path)
-
     return redirect(url_for('index'))
 
 
@@ -187,14 +189,14 @@ def upload_file():
     file.save(filepath)
 
     try:
-        df, error = load_data(filepath)
+        df, error, _ = load_data(filepath)
         if error:
             flash(error, 'danger')
             return redirect(url_for('index'))
         
         save_df_to_session(df)
         session['history'] = []
-        flash('File uploaded and ingested as a scalable Dask DataFrame!', 'success')
+        flash('File uploaded and ingested as a Pandas DataFrame!', 'success')
     except Exception as e:
         flash(f"Error processing file: {e}", 'danger')
 
@@ -206,36 +208,22 @@ def data_viewer():
     Handles POST requests for viewing and filtering the dataset.
 
     This function is responsible for processing a form submission from the
-    data viewer section of the application. It retrieves the Dask DataFrame
-    from the user's session, performs an action (e.g., displaying the head),
-    and then re-renders the main index page.
-
-    The primary purpose of this endpoint is to act as the form's action for
-    data display controls, such as showing the top N rows or refreshing the view.
-
-    Returns:
-        A redirect to the index page, with a flash message indicating success or failure.
+    data viewer section of the application. It retrieves the Pandas DataFrame
+    from the user's session and re-renders the main index page.
     """
     try:
-        # Load the Dask DataFrame from the session
+        # Load the Pandas DataFrame from the session
         df = load_df_from_session()
         
         if df is None:
             flash('No data loaded. Please ingest a dataset first.', 'warning')
             return redirect(url_for('index'))
-            
-        # You can add logic here to process the form data if needed.
-        # For example, if the form had a button to show the first 10 rows:
-        # head_df = df.head(10)
-        # Pass this to the template for rendering.
 
-        # For now, we will simply redirect back to the index page with a success message.
-        flash('Data viewer form submitted successfully!', 'success')
+        flash('Data viewer refreshed!', 'success')
         
-        # Track the action in the project history
         track_history({
             'action': 'data_viewer_action',
-            'details': 'Form submitted without specific action.'
+            'details': 'View refreshed.'
         })
 
     except Exception as e:
@@ -271,8 +259,7 @@ def data_cleaning():
         return redirect(url_for('data_cleaning'))
 
     columns = df.columns
-    df_for_view = df.head()
-    data_viewer = generate_df_viewer(df_for_view)
+    data_viewer = generate_df_viewer(df.head())
     
     return render_template('data_cleaning.html', data_viewer=data_viewer, columns=columns)
 
@@ -299,15 +286,13 @@ def data_combining():
 
         try:
             # Load the new data to combine
-            new_df, error = load_data(filepath)
+            new_df, error, _ = load_data(filepath)
             if error:
                 flash(error, 'danger')
                 return redirect(url_for('data_combining'))
 
             # Get combining parameters from the form
             method = request.form.get('method')
-            # You'll need to handle the other kwargs like 'on', 'how', etc., from the form
-            # For simplicity, this example assumes 'on' is a required form field.
             on_column = request.form.get('on_column')
 
             # Combine the DataFrames
@@ -360,8 +345,7 @@ def data_filtering():
         return redirect(url_for('data_filtering'))
 
     columns = df.columns
-    df_for_view = df.head()
-    data_viewer = generate_df_viewer(df_for_view)
+    data_viewer = generate_df_viewer(df.head())
     
     return render_template('data_filtering.html', data_viewer=data_viewer, columns=columns)
 
@@ -373,14 +357,12 @@ def data_aggregation():
         return redirect(url_for('index'))
 
     if request.method == 'POST':
-        action = request.form.get('action')
-        # Placeholder for Dask-aware aggregation logic
-        flash(f"Action '{action}' is not yet refactored for Dask.", 'info')
+        # This is a placeholder for future implementation
+        flash(f"Aggregation features are not yet implemented.", 'info')
         return redirect(url_for('data_aggregation'))
 
     columns = df.columns
-    df_for_view = df.head()
-    data_viewer = generate_df_viewer(df_for_view)
+    data_viewer = generate_df_viewer(df.head())
     
     return render_template('data_aggregation.html', data_viewer=data_viewer, columns=columns)
 
@@ -407,8 +389,7 @@ def data_engineering():
         return redirect(url_for('data_engineering'))
 
     columns = df.columns
-    df_for_view = df.head()
-    data_viewer = generate_df_viewer(df_for_view)
+    data_viewer = generate_df_viewer(df.head())
     
     return render_template('data_engineering.html', data_viewer=data_viewer, columns=columns)
 
@@ -420,13 +401,12 @@ def data_eda():
         return redirect(url_for('index'))
     
     if request.method == 'POST':
-        # Placeholder for EDA logic, which would need to be Dask-aware or use .compute() carefully
-        flash("EDA generation is not yet refactored for Dask.", 'info')
+        # This is a placeholder for future implementation
+        flash("EDA generation is not yet implemented.", 'info')
         return redirect(url_for('data_eda'))
 
     columns = df.columns
-    df_for_view = df.head()
-    data_viewer = generate_df_viewer(df_for_view)
+    data_viewer = generate_df_viewer(df.head())
     
     return render_template('data_eda.html', data_viewer=data_viewer, columns=columns)
 
@@ -439,9 +419,8 @@ def modeling():
         return redirect(url_for('index'))
     
     if request.method == 'POST':
-        # For modeling, we need to compute the data to pass to scikit-learn
-        pandas_df = df.compute()
-        report = run_model(pandas_df, request.form.get('target_column'), request.form.get('model_type'), request.form.get('model_name'))
+        # With pandas, the dataframe is already in memory, no .compute() needed.
+        report = run_model(df, request.form.get('target_column'), request.form.get('model_type'), request.form.get('model_name'))
         
         if 'error' in report:
             flash(report['error'], 'danger')
@@ -510,9 +489,8 @@ def download(file_format):
         flash('No data to download.', 'warning')
         return redirect(url_for('index'))
 
-    # For download, we need to compute the result and convert to pandas
-    pandas_df = df.compute()
-    data, error = export_dataframe(pandas_df, file_format)
+    # With pandas, the dataframe is already in memory, no .compute() needed.
+    data, error = export_dataframe(df, file_format)
 
     if error:
         flash(error, 'danger')
