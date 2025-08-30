@@ -1,7 +1,7 @@
 import os
 import json
 import shutil
-import dask.dataframe as dd
+import pandas as pd
 from datetime import datetime
 
 PROJECTS_DIR = 'projects/'
@@ -12,20 +12,19 @@ def _ensure_projects_dir():
 
 def save_project(project_name, df, history):
     """
-    Saves the current state of a project, including the Dask DataFrame.
+    Saves the current state of a project, including the Pandas DataFrame.
 
-    Technical: A new directory is created for the project. The Dask DataFrame is
-    saved to a subdirectory named 'data' using the Parquet format, which is efficient
-    for Dask's parallel processing. Project metadata and the operation history are
-    saved as a JSON file.
+    Technical: A new directory is created for the project. The Pandas DataFrame is
+    saved as a single Parquet file, which is efficient for storage. Project
+    metadata and the operation history are saved as a JSON file.
 
     Layman: This function saves all your work on a project. It creates a special
-    folder for your project and stores the large data file and a log of all
-    the steps you've taken so far.
+    folder for your project and stores your data file and a log of all the steps
+    you've taken so far.
 
     Args:
         project_name (str): The name for the project.
-        df (dd.DataFrame): The current Dask DataFrame to save.
+        df (pd.DataFrame): The current Pandas DataFrame to save.
         history (list): A list of operations performed.
 
     Returns:
@@ -38,8 +37,8 @@ def save_project(project_name, df, history):
 
     try:
         os.makedirs(project_path)
-        # Save the Dask DataFrame to a subdirectory, as Dask saves multiple files
-        df.to_parquet(os.path.join(project_path, 'data'))
+        # Save the Pandas DataFrame to a single Parquet file
+        df.to_parquet(os.path.join(project_path, 'data.parquet'))
         # Save metadata and history
         metadata = {
             'name': project_name,
@@ -57,11 +56,11 @@ def save_project(project_name, df, history):
 
 def load_project(project_name):
     """
-    Loads a project's Dask DataFrame and history.
+    Loads a project's Pandas DataFrame and history.
 
-    Technical: The function looks for a project directory by name. It then uses Dask's
-    `read_parquet` to load the data lazily from the 'data' subdirectory. The metadata,
-    including the operation history, is loaded from the 'project.json' file.
+    Technical: The function looks for a project directory by name. It then uses
+    pandas' `read_parquet` to load the data from the 'data.parquet' file. The
+    metadata, including the operation history, is loaded from the 'project.json' file.
 
     Layman: This function opens a previously saved project. It gets the data you were
     working on and all the steps you performed, so you can continue right where you left off.
@@ -70,14 +69,14 @@ def load_project(project_name):
         project_name (str): The name of the project to load.
 
     Returns:
-        tuple: (Dask DataFrame, history, error_message)
+        tuple: (Pandas DataFrame, history, error_message)
     """
     project_path = os.path.join(PROJECTS_DIR, project_name)
     if not os.path.exists(project_path):
         return None, None, "Project not found."
 
     try:
-        df = dd.read_parquet(os.path.join(project_path, 'data'))
+        df = pd.read_parquet(os.path.join(project_path, 'data.parquet'))
         with open(os.path.join(project_path, 'project.json'), 'r') as f:
             metadata = json.load(f)
         history = metadata.get('history', [])
